@@ -1,7 +1,6 @@
 "use server";
 
 import {db, auth} from "@/firebase/admin";
-import {getFirestore} from "firebase/firestore";
 import {cookies} from "next/headers";
 
 const ONE_WEEK = 60 * 60 * 24* 7;
@@ -112,7 +111,6 @@ export async function getCurrentUser(): Promise<User | null> {
     }
 }
 
-// Check if user is authenticated
 export async function isAuthenticated() {
     const user = await getCurrentUser();
     return !!user;
