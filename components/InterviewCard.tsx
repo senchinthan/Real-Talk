@@ -13,10 +13,15 @@ const InterviewCard = async ({
                            type,
                            techstack,
                            createdAt,
+                           currentUserId,
                        }: InterviewCardProps) => {
-    const feedback = userId && id
-    ? await getFeedbackByInterviewId({ interviewId: id, userId})
-        : null;
+    console.log('InterviewCard props:', { id, userId, role, type });
+    
+    const feedback = await getFeedbackByInterviewId({ interviewId: id, userId });
+    
+    console.log('InterviewCard feedback:', feedback);
+    console.log('Feedback totalScore:', feedback?.totalScore, 'Type:', typeof feedback?.totalScore);
+    console.log('Feedback keys:', feedback ? Object.keys(feedback) : 'No feedback');
     const normalizedType = /mix/gi.test(type) ? 'Mixed' : 'type';
     const formattedDate = dayjs(feedback?.createdAt || createdAt || Date.now()).format('MMM D, YYYY');
     return (
@@ -51,7 +56,12 @@ const InterviewCard = async ({
 
                         <div className="flex flex-row gap-2 items-center">
                             <Image src="/star.svg" width={22} height={22} alt="star" />
-                            <p>{feedback?.totalScore || "---"}/100</p>
+                            <p>
+                                {feedback?.totalScore !== undefined && feedback?.totalScore !== null 
+                                    ? `${feedback.totalScore}/100` 
+                                    : "---/100"
+                                }
+                            </p>
                         </div>
                     </div>
 
@@ -66,17 +76,26 @@ const InterviewCard = async ({
             <div className="flex flex-row justify-between">
                 <DisplayTechIcons techStack={techstack} />
 
-                <Button className="btn-primary">
-                    <Link
-                        href={
-                            feedback
-                                ? `/interview/${id}/feedback`
-                                : `/interview/${id}`
-                        }
-                    >
-                        {feedback ? "Check Feedback" : "View Interview"}
-                    </Link>
-                </Button>
+                <div className="flex flex-row gap-2">
+                    {feedback && currentUserId && (
+                        <Button className="btn-secondary">
+                            <Link href={`/interview/${id}/feedback`}>
+                                View Feedback
+                            </Link>
+                        </Button>
+                    )}
+                    <Button className="btn-primary">
+                        <Link
+                            href={
+                                feedback
+                                    ? `/interview/${id}/feedback`
+                                    : `/interview/${id}`
+                            }
+                        >
+                            {feedback ? "Check Feedback" : "View Interview"}
+                        </Link>
+                    </Button>
+                </div>
             </div>
         </div>
 

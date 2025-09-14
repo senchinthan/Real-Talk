@@ -3,6 +3,12 @@ import { getCurrentUser } from "@/lib/actions/auth.action";
 
 const Page = async () => {
     const user = await getCurrentUser();
+    
+    console.log('Interview generation page - user data:', { 
+        userId: user?.id, 
+        userName: user?.name,
+        userEmail: user?.email 
+    });
 
     return (
         <>

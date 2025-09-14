@@ -4,11 +4,61 @@ import {getRandomInterviewCover} from "@/lib/utils";
 import {db} from "@/firebase/admin";
 
 export async function GET(){
-    return Response.json({ success: true,data: 'THANK YOU'}, { status: 200 });
+    console.log('Generate API GET endpoint called');
+    return Response.json({ 
+        success: true,
+        data: 'THANK YOU',
+        timestamp: new Date().toISOString()
+    }, { status: 200 });
 }
 
 export async function POST(request: Request) {
-    const { type, role, level, techstack, amount, userid } = await request.json();
+    console.log('Generate API POST endpoint called at:', new Date().toISOString());
+    
+    let type, role, level, techstack, amount, userid;
+    
+    try {
+        const body = await request.json();
+        console.log('Raw request body:', body);
+        
+        ({ type, role, level, techstack, amount, userid } = body);
+        
+        console.log('Generate API received data:', { type, role, level, techstack, amount, userid });
+        console.log('Userid type:', typeof userid, 'Value:', userid);
+    } catch (error) {
+        console.error('Error parsing request body:', error);
+        return Response.json({ 
+            success: false, 
+            error: 'Invalid JSON in request body' 
+        }, { status: 400 });
+    }
+
+    // Clean and validate userid
+    const cleanedUserId = userid ? userid.toString().trim() : null;
+    const actualUserId = cleanedUserId && 
+                        cleanedUserId !== 'default_userid' && 
+                        cleanedUserId !== '' && 
+                        cleanedUserId.length > 10 && // Firebase user IDs are typically longer
+                        !cleanedUserId.includes(' ') ? // Should not contain spaces
+                        cleanedUserId : null;
+    
+    console.log('Cleaned userId:', cleanedUserId, 'Actual userId:', actualUserId);
+    
+    if (!actualUserId) {
+        console.error('Invalid or missing userid:', { 
+            original: userid, 
+            cleaned: cleanedUserId, 
+            reason: !cleanedUserId ? 'null/undefined' : 
+                   cleanedUserId === 'default_userid' ? 'default value' :
+                   cleanedUserId === '' ? 'empty string' :
+                   cleanedUserId.length <= 10 ? 'too short' :
+                   cleanedUserId.includes(' ') ? 'contains spaces' : 'unknown'
+        });
+        return Response.json({ 
+            success: false, 
+            error: 'Invalid user ID provided' 
+        }, { status: 400 });
+    }
 
     try {
         const { text: questions } = await generateText({
@@ -34,8 +84,9 @@ export async function POST(request: Request) {
             level: level,
             techstack: techstack.split(","),
             questions: JSON.parse(questions),
-            userId: userid,
+            userId: actualUserId, // Use the validated user ID
             finalized: true,
+            isUserGenerated: true, // Mark as user-generated
             coverImage: getRandomInterviewCover(),
             createdAt: new Date().toISOString(),
         };

@@ -6,7 +6,7 @@ import {redirect, useRouter} from "next/navigation";
 import {useEffect, useState} from "react";
 import { vapi } from "@/lib/vapi.sdk";
 import {interviewer} from "@/constants";
-import {createFeedback} from "@/lib/actions/general.action";
+// Removed direct import of server action
 
 enum CallStatus {
     INACTIVE= "INACTIVE",
@@ -59,20 +59,56 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
         }
     }, [])
 
-    const handleGenerateFeedback =async (messages:SavedMessage[])=> {
+    const handleGenerateFeedback = async (messages: SavedMessage[]) => {
         console.log('Generate Feedback here');
+        console.log('Messages to process:', messages);
+        console.log('Interview ID:', interviewId);
+        console.log('User ID:', userId);
 
-        const { success, feedbackId: id }= await createFeedback({
-            interviewId: interviewId!,
-            userId: userId!,
-            transcript: messages
-        })
-
-        if(success && id) {
-            router.push(`/interview/${interviewId}/feedback`);
+        if (!interviewId || !userId || !messages || messages.length === 0) {
+            console.error('Missing required data for feedback generation:', {
+                interviewId,
+                userId,
+                messagesLength: messages?.length
+            });
+            redirect('/');
+            return;
         }
-        else{
-            console.log('error saving feedback');
+
+        try {
+            const response = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    interviewId: interviewId,
+                    userId: userId,
+                    transcript: messages
+                })
+            });
+
+            console.log('Feedback API response status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API response not OK:', response.status, errorText);
+                redirect('/');
+                return;
+            }
+
+            const result = await response.json();
+            console.log('Feedback API result:', result);
+
+            if (result.success && result.feedbackId) {
+                console.log('Feedback generated successfully, redirecting to:', `/interview/${interviewId}/feedback`);
+                router.push(`/interview/${interviewId}/feedback`);
+            } else {
+                console.error('Feedback generation failed:', result.error);
+                redirect('/');
+            }
+        } catch (error) {
+            console.error('Error creating feedback:', error);
             redirect('/');
         }
     }
@@ -86,13 +122,13 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
                 handleGenerateFeedback(messages);
             }
         }
-        if (callStatus === CallStatus.FINISHED) router.push('/');
         }, [messages, callStatus, type, userId]);
 
     const handleCall = async () => {
         setCallStatus(CallStatus.CONNECTING);
 
         if(type==='generate'){
+            console.log('Starting VAPI generate with userId:', userId, 'userName:', userName);
             await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID, {
                 variableValues: {
                     username: userName,
