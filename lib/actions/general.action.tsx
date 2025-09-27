@@ -16,6 +16,7 @@ export async function getInterviewsByUserId(userId: string): Promise<Interview[]
         ...doc.data()
     })) as Interview[];
 }
+
 export async function getLatestInterviews(params: GetLatestInterviewsParams): Promise<Interview[] | null> {
     const { userId, limit=20 } = params;
 
@@ -44,13 +45,17 @@ export async function getInterviewById(id: string): Promise<Interview | null> {
 
 export async function createFeedback(params: CreateFeedbackParams){
     const { interviewId, userId, transcript } = params;
+    
+    // Trim whitespace to ensure consistency
+    const trimmedInterviewId = interviewId?.trim();
+    const trimmedUserId = userId?.trim();
 
     try{
         const formattedTranscript = transcript
             .map((sentence: {role: string; content: string; }) => (
                 `-${sentence.role}:${sentence.content}\n`
             )).join('');
-        const { object: { totalScore, categoryScores, strengths, areasForImprovement, finalAssessment } } = await generateObject({
+        const { object } = await generateObject({
             model: google( "gemini-2.0-flash-001"),
             schema: feedbackSchema,
             mode: "auto",
@@ -59,20 +64,35 @@ export async function createFeedback(params: CreateFeedbackParams){
         Transcript:
         ${formattedTranscript}
 
-        Please score the candidate from 0 to 100 in the following areas. Do not add categories other than the ones provided:
-        - **Communication Skills**: Clarity, articulation, structured responses.
-        - **Technical Knowledge**: Understanding of key concepts for the role.
-        - **Problem-Solving**: Ability to analyze problems and propose solutions.
-        - **Cultural & Role Fit**: Alignment with company values and job role.
-        - **Confidence & Clarity**: Confidence in responses, engagement, and clarity.
+        Please score the candidate from 0 to 100 in the following areas. Return exactly these 5 categories with these exact names:
+        1. "Communication Skills" - Clarity, articulation, structured responses
+        2. "Technical Knowledge" - Understanding of key concepts for the role
+        3. "Problem Solving" - Ability to analyze problems and propose solutions
+        4. "Cultural Fit" - Alignment with company values and job role
+        5. "Confidence and Clarity" - Confidence in responses, engagement, and clarity
+
+        For each category, provide:
+        - name: The exact category name as listed above
+        - score: A number from 0 to 100
+        - comment: A detailed explanation of the score
+
+        Also provide:
+        - totalScore: Overall score from 0 to 100
+        - strengths: Array of specific strengths observed
+        - areasForImprovement: Array of specific areas that need improvement
+        - finalAssessment: A comprehensive summary of the candidate's performance
         `,
             system:
                 "You are a professional interviewer analyzing a mock interview. Your task is to evaluate the candidate based on structured categories",
         });
 
+        console.log('Generated feedback object:', object);
+        
+        const { totalScore, categoryScores, strengths, areasForImprovement, finalAssessment } = object;
+
         const feedback = await db.collection('feedback').add({
-            interviewId,
-            userId,
+            interviewId: trimmedInterviewId,
+            userId: trimmedUserId,
             totalScore,
             categoryScores,
             strengths,
@@ -81,13 +101,49 @@ export async function createFeedback(params: CreateFeedbackParams){
             createdAt: new Date().toISOString(),
         })
 
+        // Mark the interview as finalized after feedback is generated
+        await db.collection('interviews').doc(trimmedInterviewId).update({
+            finalized: true
+        });
+
         return {
             success: true,
             feedbackId: feedback.id
         }
     } catch(e) {
-        console.error('Error saving feedback');
+        console.error('Error saving feedback:', e);
 
-        return { success: false }
+        return { success: false, error: e instanceof Error ? e.message : 'Unknown error' }
     }
+}
+
+export async function getFeedbackByInterviewId(params: GetFeedbackByInterviewIdParams): Promise<Feedback | null> {
+    const { interviewId, userId } = params;
+    
+    // Trim whitespace from userId to prevent query issues
+    const trimmedUserId = userId?.trim();
+    const trimmedInterviewId = interviewId?.trim();
+
+    console.log('Looking for feedback:', { interviewId: trimmedInterviewId, userId: trimmedUserId });
+
+    const feedback = await db
+        .collection('feedback')
+        .where('interviewId', '==', trimmedInterviewId)
+        .where('userId', '==', trimmedUserId)
+        .limit(1)
+        .get();
+
+    console.log('Feedback query result:', { 
+        empty: feedback.empty, 
+        size: feedback.size,
+        docs: feedback.docs.map(doc => ({ id: doc.id, data: doc.data() }))
+    });
+
+    if(feedback.empty) return null;
+
+    const feedbackDoc = feedback.docs[0];
+    return{
+        id: feedbackDoc.id, ...feedbackDoc.data()
+,    } as Feedback;
+
 }

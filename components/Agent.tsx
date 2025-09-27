@@ -58,19 +58,34 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
         }
     }, [])
 
-    const handleGenerateFeedback =async (messages:SavedMessage[])=> {
-        console.log('Generate Feedback here');
+    const handleGenerateFeedback = async (messages: SavedMessage[]) => {
+        console.log('Generate Feedback here', { interviewId, userId, messagesCount: messages.length });
 
-        const { success, id }={
-            success:true,
-            id: 'feedback-id'
-        }
+        try {
+            const response = await fetch('/api/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    interviewId: interviewId!,
+                    userId: userId!,
+                    transcript: messages
+                })
+            });
 
-        if(success && id) {
-            router.push(`/interview/${interviewId}/feedback`);
-        }
-        else{
-            console.log('error saving feedback');
+            console.log('Feedback API response status:', response.status);
+            const result = await response.json();
+            console.log('Feedback API response:', result);
+
+            if (result.success && result.feedbackId) {
+                router.push(`/interview/${interviewId}/feedback`);
+            } else {
+                console.log('error saving feedback:', result);
+                redirect('/');
+            }
+        } catch (error) {
+            console.error('Error calling feedback API:', error);
             redirect('/');
         }
     }
@@ -84,7 +99,6 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
                 handleGenerateFeedback(messages);
             }
         }
-        if (callStatus === CallStatus.FINISHED) router.push('/');
         }, [messages, callStatus, type, userId]);
 
     const handleCall = async () => {
