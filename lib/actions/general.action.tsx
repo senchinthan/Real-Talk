@@ -90,9 +90,18 @@ export async function createFeedback(params: CreateFeedbackParams){
         
         const { totalScore, categoryScores, strengths, areasForImprovement, finalAssessment } = object;
 
+        // Determine next attempt number
+        const previousAttemptsSnap = await db
+            .collection('feedback')
+            .where('interviewId', '==', trimmedInterviewId)
+            .where('userId', '==', trimmedUserId)
+            .get();
+        const attempt = (previousAttemptsSnap?.size || 0) + 1;
+
         const feedback = await db.collection('feedback').add({
             interviewId: trimmedInterviewId,
             userId: trimmedUserId,
+            attempt,
             totalScore,
             categoryScores,
             strengths,
@@ -130,6 +139,7 @@ export async function getFeedbackByInterviewId(params: GetFeedbackByInterviewIdP
         .collection('feedback')
         .where('interviewId', '==', trimmedInterviewId)
         .where('userId', '==', trimmedUserId)
+        .orderBy('createdAt', 'desc')
         .limit(1)
         .get();
 
