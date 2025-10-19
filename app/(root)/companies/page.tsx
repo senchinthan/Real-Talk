@@ -2,6 +2,8 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { getCompanyTemplates } from '@/lib/actions/company.action';
 
 const CompaniesPage = async () => {
@@ -19,52 +21,53 @@ const CompaniesPage = async () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {templates.map((template) => (
-          <div key={template.id} className="card-border p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <Image
-                  src={template.companyLogo}
-                  alt={`${template.companyName} logo`}
-                  width={32}
-                  height={32}
-                  className="rounded-full"
-                />
+          <Card key={template.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                  <Image
+                    src={template.companyLogo}
+                    alt={`${template.companyName} logo`}
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">{template.companyName}</CardTitle>
+                  <CardDescription>{template.rounds.length} rounds</CardDescription>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-semibold">{template.companyName}</h3>
-                <p className="text-sm text-muted-foreground">{template.rounds.length} rounds</p>
-              </div>
-            </div>
+            </CardHeader>
+            
+            <CardContent>
+              <CardDescription className="mb-4 line-clamp-2">
+                {template.description}
+              </CardDescription>
 
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-              {template.description}
-            </p>
-
-            <div className="mb-4">
-              <h4 className="font-medium mb-2">Rounds included:</h4>
-              <div className="flex flex-wrap gap-2">
-                {template.rounds.map((round) => (
-                  <span
-                    key={round.id}
-                    className="px-2 py-1 bg-primary/10 text-primary text-xs rounded-full"
-                  >
-                    {round.name}
-                  </span>
-                ))}
+              <div className="mb-4">
+                <h4 className="font-medium mb-2">Rounds included:</h4>
+                <div className="flex flex-wrap gap-2">
+                  {template.rounds.map((round) => (
+                    <Badge key={round.id} variant="secondary">
+                      {round.name}
+                    </Badge>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Duration: {template.rounds.reduce((total, round) => total + round.duration, 0)} min
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  Duration: {template.rounds.reduce((total, round) => total + round.duration, 0)} min
+                </div>
+                <Button asChild>
+                  <Link href={`/companies/${template.id}`}>
+                    Start Interview
+                  </Link>
+                </Button>
               </div>
-              <Button asChild className="btn-primary">
-                <Link href={`/companies/${template.id}`}>
-                  Start Interview
-                </Link>
-              </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 

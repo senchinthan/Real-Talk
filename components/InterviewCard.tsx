@@ -67,14 +67,6 @@ const InterviewCard = async ({
                 <DisplayTechIcons techStack={techstack} />
 
                 <div className="flex gap-2">
-                    {feedback && (
-                        <Button className="btn-secondary" asChild>
-                            <Link href={`/interview/${id}`}>
-                                Retake Interview
-                            </Link>
-                        </Button>
-                    )}
-
                     <Button className="btn-primary" asChild>
                         <Link
                             href={
