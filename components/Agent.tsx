@@ -19,7 +19,7 @@ interface SavedMessage {
     content: string;
 }
 
-const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) => {
+const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundName }: AgentProps) => {
     const router = useRouter();
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
@@ -70,7 +70,9 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
                 body: JSON.stringify({
                     interviewId: interviewId!,
                     userId: userId!,
-                    transcript: messages
+                    transcript: messages,
+                    ...(roundId && { roundId }),
+                    ...(roundName && { roundName })
                 })
             });
 
@@ -79,7 +81,14 @@ const Agent = ({ userName, userId, type, interviewId, questions }: AgentProps) =
             console.log('Feedback API response:', result);
 
             if (result.success && result.feedbackId) {
-                router.push(`/interview/${interviewId}/feedback`);
+                if (roundId) {
+                    // For company interviews, we need to get the template ID from the interview
+                    // For now, redirect to the company dashboard
+                    router.push(`/companies/${interviewId}`);
+                } else {
+                    // For regular interviews, redirect to general feedback
+                    router.push(`/interview/${interviewId}/feedback`);
+                }
             } else {
                 console.log('error saving feedback:', result);
                 redirect('/');

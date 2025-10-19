@@ -14,6 +14,39 @@ interface Feedback {
   createdAt: string;
 }
 
+interface CompanyTemplate {
+  id: string;
+  companyName: string;
+  companyLogo: string;
+  description: string;
+  rounds: Round[];
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface Round {
+  id: string;
+  name: string; // "Aptitude", "Coding", "System Design", "Behavioral"
+  type: "voice" | "text" | "code";
+  duration: number; // in minutes
+  questions: string[];
+  passingScore?: number;
+}
+
+interface CompanyInterview {
+  id: string;
+  templateId: string;
+  companyName: string;
+  userId: string;
+  createdAt: string;
+  completedRounds: string[]; // array of round IDs
+}
+
+interface RoundFeedback extends Feedback {
+  roundId: string;
+  roundName: string;
+}
+
 interface Interview {
   id: string;
   role: string;
@@ -24,6 +57,8 @@ interface Interview {
   userId: string;
   type: string;
   finalized: boolean;
+  companyTemplateId?: string;
+  roundId?: string;
 }
 
 interface CreateFeedbackParams {
@@ -31,6 +66,8 @@ interface CreateFeedbackParams {
   userId: string;
   transcript: { role: string; content: string }[];
   feedbackId?: string;
+  roundId?: string;
+  roundName?: string;
 }
 
 interface User {
@@ -55,6 +92,8 @@ interface AgentProps {
   feedbackId?: string;
   type: "generate" | "interview";
   questions?: string[];
+  roundId?: string;
+  roundName?: string;
 }
 
 interface RouteParams {

@@ -44,7 +44,7 @@ export async function getInterviewById(id: string): Promise<Interview | null> {
 }
 
 export async function createFeedback(params: CreateFeedbackParams){
-    const { interviewId, userId, transcript } = params;
+    const { interviewId, userId, transcript, roundId, roundName } = params;
     
     // Trim whitespace to ensure consistency
     const trimmedInterviewId = interviewId?.trim();
@@ -108,6 +108,8 @@ export async function createFeedback(params: CreateFeedbackParams){
             areasForImprovement,
             finalAssessment,
             createdAt: new Date().toISOString(),
+            ...(roundId && { roundId }),
+            ...(roundName && { roundName }),
         })
 
         // Mark the interview as finalized after feedback is generated
