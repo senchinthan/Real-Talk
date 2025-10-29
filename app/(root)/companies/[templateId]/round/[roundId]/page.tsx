@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import Agent from '@/components/Agent';
+import RoundInterviewWrapper from '@/components/RoundInterviewWrapper';
 import { getCurrentUser } from '@/lib/actions/auth.action';
 import { getCompanyTemplateById, getCompanyInterviewsByUserId, createCompanyInterview } from '@/lib/actions/company.action';
 import { ArrowLeft, Clock, Users } from 'lucide-react';
@@ -76,14 +76,14 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" asChild>
+        <Button variant="ghost" size="icon" asChild className="text-white hover:bg-muted">
           <Link href={`/companies/${templateId}`}>
             <ArrowLeft className="w-4 h-4" />
           </Link>
         </Button>
         
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
             <Image
               src={template.companyLogo}
               alt={`${template.companyName} logo`}
@@ -93,8 +93,8 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
             />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">{template.companyName} - {round.name}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+            <h1 className="text-xl sm:text-2xl font-bold text-white">{template.companyName} - {round.name}</h1>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Clock className="w-4 h-4" />
                 {round.duration} minutes
@@ -111,10 +111,10 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
 
       {/* Round Info */}
       <div className="card-border p-6 mb-8">
-        <h2 className="text-lg font-semibold mb-4">Round Information</h2>
+        <h2 className="text-lg font-semibold mb-4 text-white">Round Information</h2>
         <div className="space-y-3">
           <div>
-            <h3 className="font-medium mb-2">Round Type: {round.name}</h3>
+            <h3 className="font-medium mb-2 text-white">Round Type: {round.name}</h3>
             <p className="text-sm text-muted-foreground">
               {round.type === 'voice' && 'This is a voice-based interview where you\'ll speak with an AI interviewer.'}
               {round.type === 'code' && 'This is a coding challenge where you\'ll solve programming problems.'}
@@ -124,7 +124,7 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
           
           {round.passingScore && (
             <div>
-              <h3 className="font-medium mb-2">Passing Score: {round.passingScore}/100</h3>
+              <h3 className="font-medium mb-2 text-white">Passing Score: {round.passingScore}/100</h3>
               <p className="text-sm text-muted-foreground">
                 You need to score at least {round.passingScore} points to pass this round.
               </p>
@@ -132,12 +132,12 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
           )}
 
           <div>
-            <h3 className="font-medium mb-2">Sample Questions</h3>
+            <h3 className="font-medium mb-2 text-white">Sample Questions</h3>
             <ul className="text-sm text-muted-foreground space-y-1">
               {round.questions.slice(0, 3).map((question, index) => (
                 <li key={index} className="flex items-start gap-2">
                   <span className="text-primary">•</span>
-                  <span>{question}</span>
+                  <span>{typeof question === 'string' ? question : question.text}</span>
                 </li>
               ))}
               {round.questions.length > 3 && (
@@ -150,14 +150,16 @@ const RoundInterviewPage = async ({ params }: RoundInterviewProps) => {
 
       {/* Interview Component */}
       <div className="card-border p-6">
-        <Agent
-          userName={user?.name || ''}
-          userId={user?.id}
-          interviewId={userInterview.id}
-          type="interview"
+        <RoundInterviewWrapper
+          roundType={round.type}
           questions={round.questions}
+          duration={round.duration}
+          interviewId={userInterview.id}
+          userId={user?.id!}
           roundId={roundId}
           roundName={round.name}
+          templateId={templateId}
+          userName={user?.name}
         />
       </div>
     </div>

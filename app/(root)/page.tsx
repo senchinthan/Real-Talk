@@ -5,8 +5,8 @@ import {Badge} from "@/components/ui/badge";
 import Link from "next/link";
 import Image from "next/image";
 import {getCurrentUser} from "@/lib/actions/auth.action";
-import {getInterviewsByUserId, getLatestInterviews} from "@/lib/actions/general.action";
-import {getCompanyInterviewsByUserId} from "@/lib/actions/company.action";
+import {getInterviewsByUserId, getLatestInterviews, getFeedbackByInterviewId} from "@/lib/actions/general.action";
+import {getCompanyInterviewsByUserId, getCumulativeFeedback} from "@/lib/actions/company.action";
 import {BarChart3, Users, TrendingUp, Clock, ArrowRight, Plus} from "lucide-react";
 
 const Page = async () => {
@@ -23,12 +23,40 @@ const Page = async () => {
     const recentInterviews = userInterviews?.slice(0, 3) || [];
     const recentCompanyInterviews = companyInterviews?.slice(0, 3) || [];
     
-    // Calculate average score from all interviews
-    const allInterviews = [...(userInterviews || []), ...(companyInterviews || [])];
-    const interviewsWithScores = allInterviews.filter(interview => interview.averageScore);
-    const averageScore = interviewsWithScores.length > 0 
-        ? Math.round(interviewsWithScores.reduce((sum, interview) => sum + (interview.averageScore || 0), 0) / interviewsWithScores.length)
-        : 0;
+    // Calculate average score from feedback
+    let totalScore = 0;
+    let scoreCount = 0;
+    
+    // Get feedback for personal interviews
+    for (const interview of userInterviews || []) {
+        try {
+            const feedback = await getFeedbackByInterviewId({ 
+                interviewId: interview.id, 
+                userId: user?.id! 
+            });
+            if (feedback && feedback.totalScore) {
+                totalScore += feedback.totalScore;
+                scoreCount++;
+            }
+        } catch (error) {
+            console.error('Error fetching feedback for interview:', interview.id, error);
+        }
+    }
+    
+    // Get feedback for company interviews (round feedback)
+    for (const interview of companyInterviews || []) {
+        try {
+            const cumulativeFeedback = await getCumulativeFeedback(interview.id, user?.id!);
+            if (cumulativeFeedback && cumulativeFeedback.averageScore) {
+                totalScore += cumulativeFeedback.averageScore;
+                scoreCount++;
+            }
+        } catch (error) {
+            console.error('Error fetching cumulative feedback for company interview:', interview.id, error);
+        }
+    }
+    
+    const averageScore = scoreCount > 0 ? Math.round(totalScore / scoreCount) : 0;
 
     return (
         <div className="container mx-auto px-4 py-8">

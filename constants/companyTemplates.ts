@@ -1,4 +1,4 @@
-import { CompanyTemplate } from "@/types";
+// Types are defined in types/index.d.ts
 
 export const companyTemplates: CompanyTemplate[] = [
   {
@@ -9,6 +9,43 @@ export const companyTemplates: CompanyTemplate[] = [
     isActive: true,
     createdAt: new Date().toISOString(),
     rounds: [
+      {
+        id: "google-aptitude",
+        name: "Aptitude Test",
+        type: "aptitude",
+        duration: 30,
+        questions: [
+          {
+            id: "q1",
+            text: "What is the time complexity of binary search?",
+            type: "mcq",
+            options: ["O(n)", "O(log n)", "O(n log n)", "O(1)"],
+            correctAnswer: 1,
+            points: 1
+          },
+          {
+            id: "q2",
+            text: "Which data structure follows LIFO principle?",
+            type: "mcq",
+            options: ["Queue", "Stack", "Array", "Linked List"],
+            correctAnswer: 1,
+            points: 1
+          },
+          {
+            id: "q3",
+            text: "Explain the difference between HTTP and HTTPS.",
+            type: "text",
+            points: 2
+          },
+          {
+            id: "q4",
+            text: "What is the purpose of a database index?",
+            type: "text",
+            points: 2
+          }
+        ],
+        passingScore: 70
+      },
       {
         id: "google-phone",
         name: "Phone Screen",
@@ -26,14 +63,47 @@ export const companyTemplates: CompanyTemplate[] = [
       {
         id: "google-coding-1",
         name: "Coding Round 1",
-        type: "voice",
+        type: "code",
         duration: 45,
         questions: [
-          "Implement a function to find the longest common subsequence between two strings",
-          "Design an algorithm to find the kth largest element in an unsorted array",
-          "Write a function to validate if a binary tree is a valid BST",
-          "Implement a LRU cache with O(1) operations",
-          "Solve the two sum problem and discuss time/space complexity"
+          {
+            id: "c1",
+            text: "Implement a function to find the longest common subsequence between two strings. The function should return the length of the LCS.",
+            type: "code",
+            testCases: [
+              {
+                input: "ABCDGH\nAEDFHR",
+                expectedOutput: "3",
+                isHidden: false
+              },
+              {
+                input: "AGGTAB\nGXTXAYB",
+                expectedOutput: "4",
+                isHidden: false
+              }
+            ],
+            points: 3,
+            difficulty: "medium"
+          },
+          {
+            id: "c2",
+            text: "Design an algorithm to find the kth largest element in an unsorted array. Implement the solution and discuss time/space complexity.",
+            type: "code",
+            testCases: [
+              {
+                input: "3 2 1 5 6 4\n2",
+                expectedOutput: "5",
+                isHidden: false
+              },
+              {
+                input: "3 2 3 1 2 4 5 5 6\n4",
+                expectedOutput: "4",
+                isHidden: false
+              }
+            ],
+            points: 3,
+            difficulty: "medium"
+          }
         ],
         passingScore: 75
       },
@@ -90,16 +160,80 @@ export const companyTemplates: CompanyTemplate[] = [
     createdAt: new Date().toISOString(),
     rounds: [
       {
+        id: "amazon-aptitude",
+        name: "Aptitude Assessment",
+        type: "aptitude",
+        duration: 30,
+        questions: [
+          {
+            id: "a1",
+            text: "What is the time complexity of quicksort in the average case?",
+            type: "mcq",
+            options: ["O(n)", "O(n log n)", "O(n²)", "O(log n)"],
+            correctAnswer: 1,
+            points: 1
+          },
+          {
+            id: "a2",
+            text: "Which AWS service is used for serverless computing?",
+            type: "mcq",
+            options: ["EC2", "Lambda", "S3", "RDS"],
+            correctAnswer: 1,
+            points: 1
+          },
+          {
+            id: "a3",
+            text: "Explain the CAP theorem and its implications for distributed systems.",
+            type: "text",
+            points: 3
+          }
+        ],
+        passingScore: 70
+      },
+      {
         id: "amazon-oa",
         name: "Online Assessment",
         type: "code",
         duration: 90,
         questions: [
-          "Implement a function to find the maximum profit from stock trading",
-          "Design an algorithm to find the longest palindromic subsequence",
-          "Implement a function to merge k sorted linked lists",
-          "Write a function to find the number of islands in a 2D grid",
-          "Implement a function to validate parentheses with different types"
+          {
+            id: "oa1",
+            text: "Implement a function to find the maximum profit from stock trading. You can buy and sell multiple times but cannot hold more than one stock at a time.",
+            type: "code",
+            testCases: [
+              {
+                input: "7 1 5 3 6 4",
+                expectedOutput: "7",
+                isHidden: false
+              },
+              {
+                input: "1 2 3 4 5",
+                expectedOutput: "4",
+                isHidden: false
+              }
+            ],
+            points: 3,
+            difficulty: "medium"
+          },
+          {
+            id: "oa2",
+            text: "Design an algorithm to find the longest palindromic subsequence in a string.",
+            type: "code",
+            testCases: [
+              {
+                input: "bbbab",
+                expectedOutput: "4",
+                isHidden: false
+              },
+              {
+                input: "cbbd",
+                expectedOutput: "2",
+                isHidden: false
+              }
+            ],
+            points: 3,
+            difficulty: "medium"
+          }
         ],
         passingScore: 80
       },

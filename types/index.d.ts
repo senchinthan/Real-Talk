@@ -24,13 +24,39 @@ interface CompanyTemplate {
   createdAt: string;
 }
 
+interface Question {
+  id: string;
+  text: string;
+  type: 'mcq' | 'text' | 'code';
+  options?: string[];           // For MCQ
+  correctAnswer?: string | number; // For MCQ (index) or text
+  testCases?: TestCase[];       // For coding questions
+  difficulty?: 'easy' | 'medium' | 'hard';
+  points?: number;
+}
+
+interface TestCase {
+  input: string;
+  expectedOutput: string;
+  isHidden?: boolean;
+}
+
 interface Round {
   id: string;
   name: string; // "Aptitude", "Coding", "System Design", "Behavioral"
-  type: "voice" | "text" | "code";
+  type: "voice" | "text" | "code" | "aptitude";
   duration: number; // in minutes
-  questions: string[];
+  questions: Question[] | string[]; // Support both old and new format
   passingScore?: number;
+}
+
+interface UserAnswer {
+  questionId: string;
+  answer: string | number;
+  code?: string;
+  language?: string;
+  isCorrect?: boolean;
+  score?: number;
 }
 
 interface CompanyInterview {

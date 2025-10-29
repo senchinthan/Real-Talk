@@ -1,5 +1,6 @@
 import { db } from "@/firebase/admin";
 import { companyTemplates } from "@/constants/companyTemplates";
+import { createFeedback } from "@/lib/actions/general.action";
 
 // Get all active company templates
 export async function getCompanyTemplates(): Promise<CompanyTemplate[]> {
@@ -188,7 +189,7 @@ export async function getCumulativeFeedback(interviewId: string, userId: string)
     // Get unique rounds (latest attempt for each round)
     const roundMap = new Map<string, RoundFeedback>();
     feedbackDocs.forEach(feedback => {
-      if (!roundMap.has(feedback.roundId) || feedback.attempt > (roundMap.get(feedback.roundId)?.attempt || 0)) {
+      if (!roundMap.has(feedback.roundId) || (feedback.attempt || 0) > (roundMap.get(feedback.roundId)?.attempt || 0)) {
         roundMap.set(feedback.roundId, feedback);
       }
     });
@@ -253,4 +254,157 @@ export async function getAllRoundFeedback(interviewId: string, userId: string): 
     console.error('Error fetching all round feedback:', error);
     return [];
   }
+}
+
+// Create feedback for a specific round (aptitude, coding, or behavioral)
+export async function createRoundFeedback(params: {
+  interviewId: string;
+  userId: string;
+  roundId: string;
+  roundName: string;
+  transcript?: { role: string; content: string }[];
+  answers?: UserAnswer[];
+  score?: number;
+}): Promise<{ success: boolean; feedbackId?: string; error?: string }> {
+  try {
+    const { interviewId, userId, roundId, roundName, transcript, answers, score } = params;
+
+    // Get the round details to understand the question type
+    const interview = await getCompanyInterviewById(interviewId);
+    if (!interview) {
+      return { success: false, error: 'Interview not found' };
+    }
+
+    // Get the template to find the round
+    const template = await getCompanyTemplateById(interview.templateId);
+    if (!template) {
+      return { success: false, error: 'Template not found' };
+    }
+
+    const round = template.rounds.find(r => r.id === roundId);
+    if (!round) {
+      return { success: false, error: 'Round not found' };
+    }
+
+    let feedbackData: any = {
+      interviewId,
+      userId,
+      roundId,
+      roundName,
+      attempt: 1, // TODO: Calculate attempt number
+      totalScore: score || 0,
+      categoryScores: [],
+      strengths: [],
+      areasForImprovement: [],
+      finalAssessment: '',
+      createdAt: new Date().toISOString()
+    };
+
+    // Generate feedback based on round type
+    if (round.type === 'aptitude' && answers) {
+      // Generate AI feedback for aptitude questions
+      feedbackData = await generateAptitudeFeedback(feedbackData, answers, round);
+    } else if (round.type === 'code' && answers) {
+      // Generate AI feedback for coding questions
+      feedbackData = await generateCodingFeedback(feedbackData, answers, round);
+    } else if (round.type === 'voice' && transcript) {
+      // Use existing voice feedback generation
+      const voiceFeedback = await createFeedback({
+        interviewId,
+        userId,
+        transcript
+      });
+      
+      if (voiceFeedback.success && voiceFeedback.feedbackId) {
+        // Get the generated feedback and adapt it for round format
+        const existingFeedback = await getRoundFeedback(interviewId, roundId, userId);
+        if (existingFeedback) {
+          feedbackData = {
+            ...feedbackData,
+            totalScore: existingFeedback.totalScore,
+            categoryScores: existingFeedback.categoryScores,
+            strengths: existingFeedback.strengths,
+            areasForImprovement: existingFeedback.areasForImprovement,
+            finalAssessment: existingFeedback.finalAssessment
+          };
+        }
+      }
+    }
+
+    // Save the feedback
+    const docRef = await db.collection('feedback').add(feedbackData);
+    
+    return { 
+      success: true, 
+      feedbackId: docRef.id 
+    };
+  } catch (error) {
+    console.error('Error creating round feedback:', error);
+    return { success: false, error: 'Failed to create round feedback' };
+  }
+}
+
+// Generate AI feedback for aptitude questions
+async function generateAptitudeFeedback(feedbackData: any, answers: UserAnswer[], round: Round): Promise<any> {
+  // This would integrate with AI to analyze text responses
+  // For now, we'll create a basic structure
+  
+  const strengths = [];
+  const areasForImprovement = [];
+  
+  // Analyze answers and generate feedback
+  if (answers.length > 0) {
+    strengths.push('Completed all questions');
+    if (feedbackData.totalScore >= 80) {
+      strengths.push('Strong performance on aptitude questions');
+    } else if (feedbackData.totalScore >= 60) {
+      areasForImprovement.push('Consider reviewing fundamental concepts');
+    } else {
+      areasForImprovement.push('Focus on improving core knowledge areas');
+    }
+  }
+
+  feedbackData.categoryScores = [
+    { name: 'Aptitude', score: feedbackData.totalScore, comment: 'Performance on aptitude questions' }
+  ];
+  
+  feedbackData.strengths = strengths;
+  feedbackData.areasForImprovement = areasForImprovement;
+  feedbackData.finalAssessment = `Scored ${feedbackData.totalScore}/100 on the ${round.name} round. ${strengths.length > 0 ? `Strengths: ${strengths.join(', ')}.` : ''} ${areasForImprovement.length > 0 ? `Areas for improvement: ${areasForImprovement.join(', ')}.` : ''}`;
+
+  return feedbackData;
+}
+
+// Generate AI feedback for coding questions
+async function generateCodingFeedback(feedbackData: any, answers: UserAnswer[], round: Round): Promise<any> {
+  // This would integrate with AI to analyze code quality
+  // For now, we'll create a basic structure
+  
+  const strengths = [];
+  const areasForImprovement = [];
+  
+  // Analyze code submissions
+  if (answers.length > 0) {
+    strengths.push('Attempted coding problems');
+    if (feedbackData.totalScore >= 80) {
+      strengths.push('Strong problem-solving skills');
+      strengths.push('Good code implementation');
+    } else if (feedbackData.totalScore >= 60) {
+      areasForImprovement.push('Focus on algorithm optimization');
+      areasForImprovement.push('Practice edge case handling');
+    } else {
+      areasForImprovement.push('Review fundamental algorithms');
+      areasForImprovement.push('Practice coding problems regularly');
+    }
+  }
+
+  feedbackData.categoryScores = [
+    { name: 'Coding', score: feedbackData.totalScore, comment: 'Performance on coding problems' }
+  ];
+  
+  feedbackData.strengths = strengths;
+  feedbackData.areasForImprovement = areasForImprovement;
+  feedbackData.finalAssessment = `Scored ${feedbackData.totalScore}/100 on the ${round.name} round. ${strengths.length > 0 ? `Strengths: ${strengths.join(', ')}.` : ''} ${areasForImprovement.length > 0 ? `Areas for improvement: ${areasForImprovement.join(', ')}.` : ''}`;
+
+  return feedbackData;
 }
