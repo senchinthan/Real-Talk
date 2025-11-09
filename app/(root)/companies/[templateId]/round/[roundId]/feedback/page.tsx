@@ -2,9 +2,14 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 import { getCurrentUser } from '@/lib/actions/auth.action';
-import { getCompanyTemplateById, getCompanyInterviewsByUserId, getRoundFeedback, markRoundComplete } from '@/lib/actions/company.action';
-import { ArrowLeft, Star, TrendingUp, TrendingDown, Clock, CheckCircle } from 'lucide-react';
+import { getCompanyTemplateById, getCompanyInterviewsByUserId } from '@/lib/actions/company.action';
+import { getRoundFeedback } from '@/lib/actions/feedback.action';
+import { ArrowLeft, Star, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { RoundFeedback } from '@/types';
 
 interface RoundFeedbackProps {
   params: Promise<{ templateId: string; roundId: string }>;
@@ -13,7 +18,8 @@ interface RoundFeedbackProps {
 const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
   const { templateId, roundId } = await params;
   const user = await getCurrentUser();
-  const template = await getCompanyTemplateById(templateId);
+  const isAdmin = user?.isAdmin || user?.role === 'admin' || false;
+  const template = await getCompanyTemplateById(templateId, isAdmin);
   
   if (!template) {
     return (
@@ -29,7 +35,7 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
     );
   }
 
-  const round = template.rounds.find(r => r.id === roundId);
+  const round = template.rounds.find((r: any) => r.id === roundId);
   if (!round) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -44,8 +50,23 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
     );
   }
 
+  // Check if user is logged in
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
+          <p className="text-muted-foreground mb-4">Please sign in to view your feedback.</p>
+          <Button asChild>
+            <Link href="/sign-in">Sign In</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
   // Get user's interview for this template
-  const userInterviews = await getCompanyInterviewsByUserId(user?.id!);
+  const userInterviews = await getCompanyInterviewsByUserId(user.id);
   const userInterview = userInterviews.find(interview => interview.templateId === templateId);
   
   if (!userInterview) {
@@ -63,7 +84,7 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
   }
 
   // Get feedback for this round
-  const feedback = await getRoundFeedback(userInterview.id, roundId, user?.id!);
+  const feedback = await getRoundFeedback(userInterview.id, roundId, user?.id!) as RoundFeedback | null;
   
   if (!feedback) {
     return (
@@ -79,17 +100,14 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
     );
   }
 
-  // Mark round as completed if not already
-  if (!userInterview.completedRounds.includes(roundId)) {
-    await markRoundComplete(userInterview.id, roundId);
-  }
-
-  const isPassing = round.passingScore ? feedback.totalScore >= round.passingScore : true;
-  const scoreColor = feedback.totalScore >= 80 ? 'text-green-600' : 
-                    feedback.totalScore >= 60 ? 'text-yellow-600' : 'text-red-600';
+  // Determine pass/fail status and colors
+  const isPassed = feedback.passed;
+  const statusColor = isPassed ? 'text-green-600' : 'text-red-600';
+  const statusBgColor = isPassed ? 'bg-green-100' : 'bg-red-100';
+  const StatusIcon = isPassed ? CheckCircle : XCircle;
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="icon" asChild>
@@ -99,15 +117,17 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
         </Button>
         
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-            <Image
-              src={template.companyLogo}
-              alt={`${template.companyName} logo`}
-              width={32}
-              height={32}
-              className="rounded-full"
-            />
-          </div>
+          {template.companyLogo && (
+            <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+              <Image
+                src={template.companyLogo}
+                alt={`${template.companyName} logo`}
+                width={32}
+                height={32}
+                className="rounded-full"
+              />
+            </div>
+          )}
           <div>
             <h1 className="text-2xl font-bold">{template.companyName} - {round.name}</h1>
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
@@ -115,163 +135,138 @@ const RoundFeedbackPage = async ({ params }: RoundFeedbackProps) => {
                 <Clock className="w-4 h-4" />
                 {round.duration} minutes
               </div>
-              <div className="flex items-center gap-1">
-                {isPassing ? (
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                ) : (
-                  <Clock className="w-4 h-4 text-yellow-500" />
-                )}
-                {isPassing ? 'Passed' : 'Needs Improvement'}
-              </div>
+              <Badge variant={isPassed ? "default" : "destructive"} className="flex items-center gap-1">
+                <StatusIcon className="w-3 h-3" />
+                <span>{isPassed ? 'PASSED' : 'FAILED'}</span>
+              </Badge>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Score Overview */}
-      <div className="card-border p-6 mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold">Round Performance</h2>
-          <div className="flex items-center gap-2">
-            <Star className="w-5 h-5 text-yellow-500" />
-            <span className={`text-2xl font-bold ${scoreColor}`}>
-              {feedback.totalScore}/100
-            </span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h3 className="font-medium mb-3">Category Scores</h3>
-            <div className="space-y-3">
-              {feedback.categoryScores.map((category, index) => (
-                <div key={index} className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">{category.name}</span>
-                    <span className="text-sm font-bold">{category.score}/100</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        category.score >= 80 ? 'bg-green-500' :
-                        category.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${category.score}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{category.comment}</p>
-                </div>
-              ))}
+      {/* Score Card */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-white">Score</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <div className="flex flex-col items-center justify-center">
+              <div className={`text-6xl font-bold mb-2 ${statusColor}`}>
+                {feedback.score}/100
+              </div>
+              <Badge variant={isPassed ? "success" : "destructive"} className="text-sm px-3 py-1">
+                {isPassed ? 'PASSED' : 'FAILED'}
+              </Badge>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div>
-            <h3 className="font-medium mb-3">Round Summary</h3>
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-white">Score Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
             <div className="space-y-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingUp className="w-4 h-4 text-green-500" />
-                  <span className="font-medium text-green-700">Strengths</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-white">Your Score:</span>
+                  <span className="font-bold text-white">{feedback.score}/100</span>
                 </div>
-                <ul className="space-y-1">
-                  {feedback.strengths.map((strength, index) => (
-                    <li key={index} className="text-sm text-green-600 flex items-start gap-2">
-                      <span className="text-green-500">•</span>
-                      <span>{strength}</span>
-                    </li>
-                  ))}
-                </ul>
+                <Progress value={feedback.score} className="h-2 mb-4 bg-primary/20" />
               </div>
-
+              
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <TrendingDown className="w-4 h-4 text-orange-500" />
-                  <span className="font-medium text-orange-700">Areas for Improvement</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-white">Passing Score:</span>
+                  <span className="font-bold text-white">{feedback.passingScore}/100</span>
                 </div>
-                <ul className="space-y-1">
-                  {feedback.areasForImprovement.map((area, index) => (
-                    <li key={index} className="text-sm text-orange-600 flex items-start gap-2">
-                      <span className="text-orange-500">•</span>
-                      <span>{area}</span>
-                    </li>
-                  ))}
-                </ul>
+                <Progress value={feedback.passingScore} className="h-2 bg-muted" />
               </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-white">Round Information</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Round Type:</span>
+              <span className="text-white">{feedback.roundType}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Duration:</span>
+              <span className="text-white">{round.duration} minutes</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Attempt:</span>
+              <span className="text-white">#{feedback.attempt || 1}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Completed:</span>
+              <span className="text-white">{new Date(feedback.createdAt).toLocaleDateString()}</span>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Detailed Assessment */}
-      <div className="card-border p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Detailed Assessment</h2>
-        <div className="prose max-w-none">
-          <p className="text-muted-foreground leading-relaxed">
-            {feedback.finalAssessment}
-          </p>
-        </div>
-      </div>
-
-      {/* Round Information */}
-      <div className="card-border p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Round Information</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-medium mb-2">Round Details</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Round Type:</span>
-                <span>{round.name}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Duration:</span>
-                <span>{round.duration} minutes</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Attempt:</span>
-                <span>#{feedback.attempt || 1}</span>
-              </div>
-              {round.passingScore && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Passing Score:</span>
-                  <span>{round.passingScore}/100</span>
-                </div>
-              )}
+      {/* Answer Summary */}
+      <Card className="mb-8 bg-card border-border w-full">
+        <CardHeader>
+          <CardTitle className="text-white">Answer Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-white">Questions Answered:</span>
+              <span className="font-bold text-white">{feedback.answers?.length || 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-white">Correct Answers:</span>
+              <span className="font-bold text-white">
+                {feedback.answers?.filter(a => a.isCorrect).length || 0} / {feedback.answers?.length || 0}
+              </span>
             </div>
           </div>
-
-          <div>
-            <h3 className="font-medium mb-2">Performance Status</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Your Score:</span>
-                <span className={scoreColor}>{feedback.totalScore}/100</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status:</span>
-                <span className={isPassing ? 'text-green-600' : 'text-orange-600'}>
-                  {isPassing ? 'Passed' : 'Needs Improvement'}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Completed:</span>
-                <span>{new Date(feedback.createdAt).toLocaleDateString()}</span>
-              </div>
+        </CardContent>
+      </Card>
+      
+      {/* Status Banner */}
+      <Card className={`mb-8 w-full ${isPassed ? 'bg-green-900/20 border-green-800' : 'bg-red-900/20 border-red-800'}`}>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-3">
+            <StatusIcon className={`w-6 h-6 ${statusColor}`} />
+            <div>
+              <h3 className={`font-semibold text-lg ${statusColor}`}>
+                {isPassed ? 'Round Passed' : 'Round Failed'}
+              </h3>
+              <p className="text-muted-foreground">
+                {isPassed 
+                  ? `Congratulations! You passed the ${round.name} round with a score of ${feedback.score}%.` 
+                  : `You did not pass the ${round.name} round. Required score: ${feedback.passingScore}%, Your score: ${feedback.score}%.`}
+              </p>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Action Buttons */}
-      <div className="flex gap-4 justify-center">
-        <Button asChild variant="outline">
+      <div className="flex flex-wrap gap-4 justify-center mt-8">
+        <Button asChild variant="outline" className="border-border text-white hover:bg-muted">
           <Link href={`/companies/${templateId}/round/${roundId}`}>
             Retake Round
           </Link>
         </Button>
-        <Button asChild>
+        <Button asChild variant="secondary" className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
           <Link href={`/companies/${templateId}`}>
-            Back to {template.companyName}
+            Back to Interview
+          </Link>
+        </Button>
+        <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
+          <Link href={`/companies/${templateId}/feedback`}>
+            View Overall Feedback
           </Link>
         </Button>
       </div>

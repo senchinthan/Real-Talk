@@ -17,8 +17,11 @@ interface CompanyDashboardProps {
 const CompanyDashboard = async ({ params }: CompanyDashboardProps) => {
   const { templateId } = await params;
   const user = await getCurrentUser();
-  const template = await getCompanyTemplateById(templateId);
-  const userInterviews = await getCompanyInterviewsByUserId(user?.id!);
+  const isAdmin = user?.isAdmin || user?.role === 'admin' || false;
+  const template = await getCompanyTemplateById(templateId, isAdmin);
+  
+  // Only fetch user interviews if user is logged in
+  const userInterviews = user ? await getCompanyInterviewsByUserId(user.id) : [];
 
   if (!template) {
     return (

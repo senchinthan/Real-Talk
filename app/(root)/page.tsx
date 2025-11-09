@@ -12,10 +12,11 @@ import {BarChart3, Users, TrendingUp, Clock, ArrowRight, Plus} from "lucide-reac
 const Page = async () => {
     const user = await getCurrentUser();
 
+    // If user is not logged in, we'll show empty data
     const [userInterviews, latestInterviews, companyInterviews] = await Promise.all([
-        getInterviewsByUserId(user?.id!),
-        getLatestInterviews({ userId: user?.id! }),
-        getCompanyInterviewsByUserId(user?.id!)
+        user ? getInterviewsByUserId(user.id) : Promise.resolve([]),
+        user ? getLatestInterviews({ userId: user.id }) : Promise.resolve([]),
+        user ? getCompanyInterviewsByUserId(user.id) : Promise.resolve([])
     ]);
 
     const totalInterviews = userInterviews?.length || 0;
@@ -27,32 +28,35 @@ const Page = async () => {
     let totalScore = 0;
     let scoreCount = 0;
     
-    // Get feedback for personal interviews
-    for (const interview of userInterviews || []) {
-        try {
-            const feedback = await getFeedbackByInterviewId({ 
-                interviewId: interview.id, 
-                userId: user?.id! 
-            });
-            if (feedback && feedback.totalScore) {
-                totalScore += feedback.totalScore;
-                scoreCount++;
+    // Only fetch feedback if user is logged in
+    if (user) {
+        // Get feedback for personal interviews
+        for (const interview of userInterviews || []) {
+            try {
+                const feedback = await getFeedbackByInterviewId({ 
+                    interviewId: interview.id, 
+                    userId: user.id 
+                });
+                if (feedback && feedback.totalScore) {
+                    totalScore += feedback.totalScore;
+                    scoreCount++;
+                }
+            } catch (error) {
+                console.error('Error fetching feedback for interview:', interview.id, error);
             }
-        } catch (error) {
-            console.error('Error fetching feedback for interview:', interview.id, error);
         }
-    }
-    
-    // Get feedback for company interviews (round feedback)
-    for (const interview of companyInterviews || []) {
-        try {
-            const cumulativeFeedback = await getCumulativeFeedback(interview.id, user?.id!);
-            if (cumulativeFeedback && cumulativeFeedback.averageScore) {
-                totalScore += cumulativeFeedback.averageScore;
-                scoreCount++;
+        
+        // Get feedback for company interviews (round feedback)
+        for (const interview of companyInterviews || []) {
+            try {
+                const cumulativeFeedback = await getCumulativeFeedback(interview.id, user.id);
+                if (cumulativeFeedback && cumulativeFeedback.averageScore) {
+                    totalScore += cumulativeFeedback.averageScore;
+                    scoreCount++;
+                }
+            } catch (error) {
+                console.error('Error fetching cumulative feedback for company interview:', interview.id, error);
             }
-        } catch (error) {
-            console.error('Error fetching cumulative feedback for company interview:', interview.id, error);
         }
     }
     
@@ -102,10 +106,21 @@ const Page = async () => {
             {/* Welcome Section */}
             <section className="mb-8">
                 <div className="text-center">
-                    <h2 className="text-2xl font-semibold mb-2">Welcome back, {user?.name}!</h2>
-                    <p className="text-muted-foreground">
-                        Ready to practice your interview skills? Choose from personalized interviews or company-specific templates.
-                    </p>
+                    {user ? (
+                        <>
+                            <h2 className="text-2xl font-semibold mb-2">Welcome back, {user.name}!</h2>
+                            <p className="text-muted-foreground">
+                                Ready to practice your interview skills? Choose from personalized interviews or company-specific templates.
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <h2 className="text-2xl font-semibold mb-2">Welcome to Real Talk</h2>
+                            <p className="text-muted-foreground">
+                                Sign in to track your interview practice and get personalized feedback.
+                            </p>
+                        </>
+                    )}
                 </div>
             </section>
 

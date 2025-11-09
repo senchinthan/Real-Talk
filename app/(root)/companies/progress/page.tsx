@@ -9,12 +9,28 @@ import { CheckCircle, Clock, Star, TrendingUp, ArrowRight } from 'lucide-react';
 
 const CompaniesProgressPage = async () => {
   const user = await getCurrentUser();
-  const companyInterviews = await getCompanyInterviewsByUserId(user?.id!);
+  
+  // If user is not logged in, redirect to sign-in page
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8 text-center">
+        <h1 className="text-3xl font-bold mb-4">Sign In Required</h1>
+        <p className="text-muted-foreground mb-6">
+          Please sign in to view your company interview progress.
+        </p>
+        <Button asChild>
+          <Link href="/sign-in">Sign In</Link>
+        </Button>
+      </div>
+    );
+  }
+  
+  const companyInterviews = await getCompanyInterviewsByUserId(user.id);
 
   // Get cumulative feedback for each interview
   const interviewsWithFeedback = await Promise.all(
     companyInterviews.map(async (interview) => {
-      const cumulativeFeedback = await getCumulativeFeedback(interview.id, user?.id!);
+      const cumulativeFeedback = await getCumulativeFeedback(interview.id, user.id);
       const template = await getCompanyTemplateById(interview.templateId);
       return {
         ...interview,

@@ -4,13 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ChevronDown, User, LogOut } from "lucide-react";
+import { ChevronDown, User, LogOut, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/actions/auth.action";
 
 const NavMenu = () => {
   const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ name?: string; email?: string; isAdmin?: boolean; } | null>(null);
   const pathname = usePathname();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -98,6 +98,22 @@ const NavMenu = () => {
                   <span>{item.name}</span>
                 </Link>
               ))}
+              
+              {/* Admin Dashboard Link - Only visible for admin users */}
+              {user?.isAdmin && (
+                <Link
+                  href="/admin"
+                  className={`flex items-center px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 hover:bg-accent hover:text-accent-foreground ${
+                    pathname?.startsWith('/admin')
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setOpen(false)}
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  <span>Admin Dashboard</span>
+                </Link>
+              )}
             </nav>
 
             {/* User Profile Section */}
@@ -107,7 +123,14 @@ const NavMenu = () => {
                   <User className="w-5 h-5 text-primary-foreground" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-card-foreground font-medium">{user?.name || 'User'}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-card-foreground font-medium">{user?.name || 'User'}</p>
+                    {user?.isAdmin && (
+                      <span className="px-1.5 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
+                        Admin
+                      </span>
+                    )}
+                  </div>
                   <p className="text-muted-foreground text-sm">{user?.email || 'user@example.com'}</p>
                 </div>
               </div>
@@ -115,14 +138,12 @@ const NavMenu = () => {
                 variant="ghost"
                 size="sm"
                 className="w-full justify-start text-muted-foreground hover:text-foreground hover:bg-accent"
-                onClick={() => {
-                  // Handle logout
-                  window.location.href = '/sign-out';
-                  setOpen(false);
-                }}
+                asChild
               >
-                <LogOut className="w-4 h-4 mr-2" />
-                Log Out
+                <Link href="/sign-out" onClick={() => setOpen(false)}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Log Out
+                </Link>
               </Button>
             </div>
           </div>

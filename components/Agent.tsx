@@ -7,6 +7,24 @@ import {useEffect, useState} from "react";
 import { vapi } from "@/lib/vapi.sdk";
 import {interviewer} from "@/constants";
 
+interface AgentProps {
+    userName: string;
+    userId: string;
+    type?: string;
+    interviewId: string;
+    questions?: string[];
+    roundId?: string;
+    roundName?: string;
+    templateId?: string;
+};
+
+interface Message {
+    type: string;
+    role: 'user' | 'system' | 'assistant';
+    transcript?: string;
+    transcriptType?: 'final' | 'partial';
+}
+
 enum CallStatus {
     INACTIVE= "INACTIVE",
     CONNECTING = "CONNECTING",
@@ -19,7 +37,7 @@ interface SavedMessage {
     content: string;
 }
 
-const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundName }: AgentProps) => {
+const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundName, templateId }: AgentProps) => {
     const router = useRouter();
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [callStatus, setCallStatus] = useState<CallStatus>(CallStatus.INACTIVE);
@@ -27,11 +45,17 @@ const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundN
 
     useEffect(() => {
         const onCallStart = () => setCallStatus(CallStatus.ACTIVE);
-        const onCallEnd = () => setCallStatus(CallStatus.FINISHED);
+        const onCallEnd = () => {
+            console.log("Call ended normally");
+            setCallStatus(CallStatus.FINISHED);
+        };
 
         const onMessage = (message: Message) => {
-            if (message.type === 'transcript' && message.transcriptType === 'final') {
-                const newMessage = { role: message.role, content: message.transcript }
+            if (message.type === 'transcript' && message.transcriptType === 'final' && message.transcript) {
+                const newMessage: SavedMessage = { 
+                    role: message.role, 
+                    content: message.transcript 
+                };
 
                 setMessages((prev) => [...prev, newMessage]);
             }
@@ -39,7 +63,23 @@ const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundN
 
         const onSpeechStart = () => setIsSpeaking(true);
         const onSpeechEnd = () => setIsSpeaking(false);
-        const onError = (error: Error) => console.log("Error:", error);
+        const onError = (error: Error) => {
+            console.log("Error:", error);
+            
+            // Handle meeting ejection errors
+            if (error.message?.includes("Meeting has ended") || 
+                error.message?.includes("ejection")) {
+                console.log("Meeting ended due to ejection - handling gracefully");
+                setCallStatus(CallStatus.FINISHED);
+                
+                // Add a system message to explain what happened
+                const systemMessage: SavedMessage = {
+                    role: 'system',
+                    content: 'The interview has ended. Your responses have been saved.'
+                };
+                setMessages((prev) => [...prev, systemMessage]);
+            }
+        };
 
         vapi.on('call-start', onCallStart);
         vapi.on('call-end', onCallEnd);
@@ -108,33 +148,75 @@ const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundN
                 handleGenerateFeedback(messages);
             }
         }
-        }, [messages, callStatus, type, userId]);
+    }, [messages, callStatus, type, userId, interviewId, roundId, roundName, templateId, router]);
 
+    const [connectionAttempts, setConnectionAttempts] = useState(0);
+    const MAX_RECONNECT_ATTEMPTS = 3;
+    
     const handleCall = async () => {
         setCallStatus(CallStatus.CONNECTING);
-
-        if(type==='generate'){
-            await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID, {
-                variableValues: {
-                    username: userName,
-                    userid: userId,
-                }
-            })
-        }
-        else{
-            let formattedQuestions ='';
-
-            if(questions) {
-                formattedQuestions=questions
-                    .map((questions)=> `- ${questions}`)
-                    .join('\n');
+        
+        try {
+            if(type==='generate'){
+                await vapi.start(process.env.NEXT_PUBLIC_VAPI_WORKFLOW_ID!, {
+                    variableValues: {
+                        username: userName,
+                        userid: userId,
+                    }
+                });
             }
+            else{
+                let formattedQuestions = '';
 
-            await vapi.start(interviewer,{
-                variableValues:{
-                    questions: formattedQuestions,
+                if(questions && questions.length > 0) {
+                    console.log(`Formatting ${questions.length} questions for Vapi interviewer`);
+                    formattedQuestions = questions
+                        .map((question)=> `- ${question}`)
+                        .join('\n');
+                } else {
+                    console.log('No questions provided, using default questions');
+                    formattedQuestions = `- Tell me about your background and experience.
+- What are your strengths and weaknesses?
+- Why are you interested in this role?
+- Describe a challenging project you worked on.
+- Do you have any questions for me?`;
                 }
-            })
+
+                console.log('Starting Vapi interview with questions:', formattedQuestions);
+                await vapi.start(interviewer, {
+                    variableValues: {
+                        questions: formattedQuestions,
+                    }
+                });
+            }
+            
+            // Reset connection attempts on successful connection
+            setConnectionAttempts(0);
+        } catch (error) {
+            console.error("Error starting call:", error);
+            
+            // Attempt to reconnect if we haven't exceeded max attempts
+            if (connectionAttempts < MAX_RECONNECT_ATTEMPTS) {
+                setConnectionAttempts(prev => prev + 1);
+                
+                // Add a system message about reconnection
+                const reconnectMessage: SavedMessage = {
+                    role: 'system',
+                    content: `Connection issue detected. Attempting to reconnect... (Attempt ${connectionAttempts + 1}/${MAX_RECONNECT_ATTEMPTS})`
+                };
+                setMessages(prev => [...prev, reconnectMessage]);
+                
+                // Wait briefly before trying again
+                setTimeout(() => handleCall(), 2000);
+            } else {
+                // We've exceeded reconnection attempts
+                setCallStatus(CallStatus.FINISHED);
+                const failedMessage: SavedMessage = {
+                    role: 'system',
+                    content: 'Unable to establish a stable connection. Please try again later.'
+                };
+                setMessages(prev => [...prev, failedMessage]);
+            }
         }
 
     }

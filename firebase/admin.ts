@@ -1,6 +1,7 @@
 import {initializeApp, cert, getApps} from 'firebase-admin/app';
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 const initFirebaseAdmin = () => {
     const apps = getApps();
@@ -11,13 +12,15 @@ const initFirebaseAdmin = () => {
                 projectId: process.env.FIREBASE_PROJECT_ID,
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
                 privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g,"\n")
-            })
+            }),
+            storageBucket: process.env.FIREBASE_STORAGE_BUCKET
         });
     }
     return {
         auth: getAuth(),
         db: getFirestore(),
+        storage: getStorage(),
     }
 }
 
-export const { auth, db } = initFirebaseAdmin();
+export const { auth, db, storage } = initFirebaseAdmin();

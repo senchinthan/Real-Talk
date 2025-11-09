@@ -1,305 +1,284 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Plus, Trash2, Save } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Plus, Pencil, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import Link from 'next/link';
 
-interface Round {
+interface Template {
   id: string;
-  name: string;
-  type: 'voice' | 'text' | 'code';
-  duration: number;
-  questions: string[];
-  passingScore?: number;
+  companyName: string;
+  companyLogo?: string;
+  description: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  rounds: Array<{
+    id: string;
+    name: string;
+    type: 'voice' | 'text' | 'code' | 'aptitude';
+    duration: number | null;
+  }>;
 }
 
 const AdminTemplatesPage = () => {
-  const [template, setTemplate] = useState({
-    companyName: '',
-    companyLogo: '',
-    description: '',
-    isActive: true
-  });
-  
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
-  const addRound = () => {
-    const newRound: Round = {
-      id: `round-${Date.now()}`,
-      name: '',
-      type: 'voice',
-      duration: 45,
-      questions: [''],
-      passingScore: 70
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        // Pass isAdmin=true to get all templates including inactive ones
+        const response = await fetch('/api/companies?isAdmin=true');
+        if (response.ok) {
+          const data = await response.json();
+          setTemplates(data.data || []);
+        } else {
+          console.error('Failed to fetch templates');
+          toast.error('Failed to fetch templates');
+        }
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        toast.error('Error fetching templates');
+      } finally {
+        setIsLoading(false);
+      }
     };
-    setRounds([...rounds, newRound]);
-  };
 
-  const removeRound = (roundId: string) => {
-    setRounds(rounds.filter(round => round.id !== roundId));
-  };
+    fetchTemplates();
+  }, []);
 
-  const updateRound = (roundId: string, field: keyof Round, value: any) => {
-    setRounds(rounds.map(round => 
-      round.id === roundId ? { ...round, [field]: value } : round
-    ));
-  };
-
-  const addQuestion = (roundId: string) => {
-    setRounds(rounds.map(round => 
-      round.id === roundId 
-        ? { ...round, questions: [...round.questions, ''] }
-        : round
-    ));
-  };
-
-  const removeQuestion = (roundId: string, questionIndex: number) => {
-    setRounds(rounds.map(round => 
-      round.id === roundId 
-        ? { 
-            ...round, 
-            questions: round.questions.filter((_, index) => index !== questionIndex)
-          }
-        : round
-    ));
-  };
-
-  const updateQuestion = (roundId: string, questionIndex: number, value: string) => {
-    setRounds(rounds.map(round => 
-      round.id === roundId 
-        ? { 
-            ...round, 
-            questions: round.questions.map((q, index) => 
-              index === questionIndex ? value : q
-            )
-          }
-        : round
-    ));
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
+  const toggleActiveStatus = async (templateId: string, currentStatus: boolean) => {
+    // Find the template name for the toast message
+    const template = templates.find(t => t.id === templateId);
+    const templateName = template?.companyName || 'Template';
+    
+    // Show loading toast
+    const toastId = toast.loading(`${currentStatus ? 'Deactivating' : 'Activating'} ${templateName}...`);
+    
     try {
-      const response = await fetch('/api/companies', {
-        method: 'POST',
+      const response = await fetch(`/api/companies/${templateId}`, {
+        method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          companyName: template.companyName,
-          companyLogo: template.companyLogo,
-          description: template.description,
-          rounds: rounds,
-          isActive: template.isActive
-        })
+        body: JSON.stringify({ isActive: !currentStatus })
       });
 
       if (response.ok) {
-        alert('Template created successfully!');
-        // Reset form
-        setTemplate({
-          companyName: '',
-          companyLogo: '',
-          description: '',
-          isActive: true
-        });
-        setRounds([]);
+        // Update local state
+        setTemplates(templates.map(template => 
+          template.id === templateId 
+            ? { ...template, isActive: !currentStatus } 
+            : template
+        ));
+        
+        // Show success toast
+        toast.success(
+          `${templateName} ${!currentStatus ? 'activated' : 'deactivated'} successfully`, 
+          { id: toastId }
+        );
       } else {
         const error = await response.json();
-        alert(`Error: ${error.error}`);
+        console.error('Failed to update template status:', error);
+        
+        // Show error toast
+        toast.error(
+          `Failed to ${currentStatus ? 'deactivate' : 'activate'} ${templateName}`, 
+          { id: toastId }
+        );
       }
     } catch (error) {
-      console.error('Error creating template:', error);
-      alert('Error creating template');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error updating template status:', error);
+      
+      // Show error toast
+      toast.error(
+        `Error ${currentStatus ? 'deactivating' : 'activating'} ${templateName}`, 
+        { id: toastId }
+      );
     }
   };
 
+  const deleteTemplate = async (templateId: string) => {
+    // Find the template name for the toast message
+    const template = templates.find(t => t.id === templateId);
+    const templateName = template?.companyName || 'Template';
+    
+    if (!confirm(`Are you sure you want to delete ${templateName}? This action cannot be undone.`)) {
+      return;
+    }
+
+    // Show loading toast
+    const toastId = toast.loading(`Deleting ${templateName}...`);
+    
+    try {
+      const response = await fetch(`/api/companies/${templateId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Check if the response has content before trying to parse it as JSON
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        let errorMessage = 'Failed to delete template';
+        try {
+          // Try to parse error response if it's JSON
+          const errorData = responseText ? JSON.parse(responseText) : {};
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If response is not JSON, use the raw text or status text
+          errorMessage = responseText || response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      // If successful, update the templates list
+      setTemplates(templates.filter(template => template.id !== templateId));
+      
+      // Show success toast
+      toast.success(`${templateName} deleted successfully`, { id: toastId });
+    } catch (error) {
+      console.error('Error deleting template:', error);
+      
+      // Show error toast
+      toast.error(
+        `Failed to delete ${templateName}: ${error instanceof Error ? error.message : 'Unknown error'}`, 
+        { id: toastId }
+      );
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold">Company Templates</h1>
+          <Button asChild>
+            <Link href="/admin/templates/create">
+              <Plus className="w-4 h-4 mr-2" /> New Template
+            </Link>
+          </Button>
+        </div>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Create Company Template</h1>
-        
-        <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Basic Information */}
-          <div className="card-border p-6">
-            <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="companyName">Company Name</Label>
-                <Input
-                  id="companyName"
-                  value={template.companyName}
-                  onChange={(e) => setTemplate({...template, companyName: e.target.value})}
-                  placeholder="e.g., Google, Amazon, Meta"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="companyLogo">Company Logo URL</Label>
-                <Input
-                  id="companyLogo"
-                  value={template.companyLogo}
-                  onChange={(e) => setTemplate({...template, companyLogo: e.target.value})}
-                  placeholder="https://example.com/logo.png"
-                  required
-                />
-              </div>
-            </div>
-            <div className="mt-4">
-              <Label htmlFor="description">Description</Label>
-              <textarea
-                id="description"
-                value={template.description}
-                onChange={(e) => setTemplate({...template, description: e.target.value})}
-                placeholder="Describe the interview process..."
-                className="w-full p-3 border rounded-md"
-                rows={3}
-                required
-              />
-            </div>
-          </div>
-
-          {/* Rounds */}
-          <div className="card-border p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Interview Rounds</h2>
-              <Button type="button" onClick={addRound} className="flex items-center gap-2">
-                <Plus className="w-4 h-4" />
-                Add Round
-              </Button>
-            </div>
-
-            {rounds.length === 0 ? (
-              <p className="text-muted-foreground text-center py-8">
-                No rounds added yet. Click "Add Round" to get started.
-              </p>
-            ) : (
-              <div className="space-y-6">
-                {rounds.map((round, index) => (
-                  <div key={round.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-medium">Round {index + 1}</h3>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeRound(round.id)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <Label>Round Name</Label>
-                        <Input
-                          value={round.name}
-                          onChange={(e) => updateRound(round.id, 'name', e.target.value)}
-                          placeholder="e.g., Phone Screen, Coding Round"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label>Type</Label>
-                        <select
-                          value={round.type}
-                          onChange={(e) => updateRound(round.id, 'type', e.target.value)}
-                          className="w-full p-3 border rounded-md"
-                        >
-                          <option value="voice">Voice Interview</option>
-                          <option value="text">Text Interview</option>
-                          <option value="code">Coding Challenge</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Duration (minutes)</Label>
-                        <Input
-                          type="number"
-                          value={round.duration}
-                          onChange={(e) => updateRound(round.id, 'duration', parseInt(e.target.value))}
-                          min="15"
-                          max="120"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mb-4">
-                      <Label>Passing Score (optional)</Label>
-                      <Input
-                        type="number"
-                        value={round.passingScore || ''}
-                        onChange={(e) => updateRound(round.id, 'passingScore', e.target.value ? parseInt(e.target.value) : undefined)}
-                        placeholder="70"
-                        min="0"
-                        max="100"
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <Label>Questions</Label>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => addQuestion(round.id)}
-                        >
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Question
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        {round.questions.map((question, qIndex) => (
-                          <div key={qIndex} className="flex gap-2">
-                            <Input
-                              value={question}
-                              onChange={(e) => updateQuestion(round.id, qIndex, e.target.value)}
-                              placeholder={`Question ${qIndex + 1}`}
-                              required
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeQuestion(round.id, qIndex)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Submit Button */}
-          <div className="flex justify-end">
-            <Button type="submit" disabled={isSubmitting || rounds.length === 0} className="btn-primary">
-              {isSubmitting ? (
-                'Creating...'
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-2" />
-                  Create Template
-                </>
-              )}
-            </Button>
-          </div>
-        </form>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Company Templates</h1>
+          <p className="text-muted-foreground">
+            Manage all company interview templates
+          </p>
+        </div>
+        <div className="w-full md:w-auto">
+          <Button asChild>
+            <Link href="/admin/templates/create" className="w-full md:w-auto">
+              <Plus className="w-4 h-4 mr-2" /> New Template
+            </Link>
+          </Button>
+        </div>
       </div>
+
+      {templates.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <h3 className="text-lg font-medium">No templates found</h3>
+          <p className="text-muted-foreground mb-4">
+            Create your first template to get started
+          </p>
+          <Button asChild>
+            <Link href="/admin/templates/create">
+              <Plus className="w-4 h-4 mr-2" /> Create Template
+            </Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {templates.map((template) => (
+            <Card key={template.id} className="flex flex-col h-full">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="text-lg">{template.companyName}</CardTitle>
+                    <CardDescription className="line-clamp-2">
+                      {template.description}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-1">
+                    <span 
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        template.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}
+                      title={template.isActive ? 'This template is visible to users and can be used for interviews' : 'This template is only visible to admins'}
+                    >
+                      {template.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-grow">
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium">Rounds:</span>{' '}
+                    {template.rounds.length} {template.rounds.length === 1 ? 'round' : 'rounds'}
+                  </div>
+                  <div className="text-sm">
+                    <span className="font-medium">Created:</span>{' '}
+                    {new Date(template.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter className="flex justify-between pt-4 border-t">
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => router.push(`/admin/templates/${template.id}/edit`)}
+                  >
+                    <Pencil className="w-4 h-4 mr-1" /> Edit
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => toggleActiveStatus(template.id, template.isActive)}
+                    className={template.isActive ? "bg-green-50 text-green-700 hover:bg-green-100" : "bg-gray-50 text-gray-700 hover:bg-gray-100"}
+                    title={template.isActive ? "Make this template unavailable to users" : "Make this template available to users for interviews"}
+                  >
+                    {template.isActive ? (
+                      <>
+                        <EyeOff className="w-4 h-4 mr-1" /> Deactivate
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="w-4 h-4 mr-1" /> Activate
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => deleteTemplate(template.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </CardFooter>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

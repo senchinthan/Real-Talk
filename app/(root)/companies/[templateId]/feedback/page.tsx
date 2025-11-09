@@ -2,9 +2,14 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { getCurrentUser } from '@/lib/actions/auth.action';
-import { getCompanyTemplateById, getCompanyInterviewsByUserId, getCumulativeFeedback, getAllRoundFeedback } from '@/lib/actions/company.action';
-import { ArrowLeft, Star, TrendingUp, TrendingDown, CheckCircle, Clock, Target, Award } from 'lucide-react';
+import { getCompanyTemplateById, getCompanyInterviewsByUserId } from '@/lib/actions/company.action';
+import { getCompanyFeedback, getAllRoundFeedback } from '@/lib/actions/feedback.action';
+import { ArrowLeft, Star, TrendingUp, TrendingDown, CheckCircle, XCircle, Clock, Target, Award } from 'lucide-react';
+import { CompanyFeedback, RoundFeedback } from '@/types';
 
 interface CumulativeFeedbackProps {
   params: Promise<{ templateId: string }>;
@@ -13,7 +18,8 @@ interface CumulativeFeedbackProps {
 const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
   const { templateId } = await params;
   const user = await getCurrentUser();
-  const template = await getCompanyTemplateById(templateId);
+  const isAdmin = user?.isAdmin || user?.role === 'admin' || false;
+  const template = await getCompanyTemplateById(templateId, isAdmin);
   
   if (!template) {
     return (
@@ -29,8 +35,23 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
     );
   }
 
+  // Check if user is logged in
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Sign In Required</h1>
+          <p className="text-muted-foreground mb-4">Please sign in to view your interview feedback.</p>
+          <Button asChild>
+            <Link href="/sign-in">Sign In</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  
   // Get user's interview for this template
-  const userInterviews = await getCompanyInterviewsByUserId(user?.id!);
+  const userInterviews = await getCompanyInterviewsByUserId(user.id);
   const userInterview = userInterviews.find(interview => interview.templateId === templateId);
   
   if (!userInterview) {
@@ -47,11 +68,11 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
     );
   }
 
-  // Get cumulative feedback
-  const cumulativeFeedback = await getCumulativeFeedback(userInterview.id, user?.id!);
-  const allRoundFeedback = await getAllRoundFeedback(userInterview.id, user?.id!);
+  // Get company feedback
+  const companyFeedback = await getCompanyFeedback(userInterview.id, user?.id!) as CompanyFeedback | null;
+  const allRoundFeedback = await getAllRoundFeedback(userInterview.id, user?.id!) as RoundFeedback[];
 
-  if (!cumulativeFeedback || cumulativeFeedback.completedRounds === 0) {
+  if (!companyFeedback || companyFeedback.completedRounds === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="text-center">
@@ -65,16 +86,16 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
     );
   }
 
-  const overallGrade = cumulativeFeedback.averageScore >= 90 ? 'A+' :
-                      cumulativeFeedback.averageScore >= 80 ? 'A' :
-                      cumulativeFeedback.averageScore >= 70 ? 'B' :
-                      cumulativeFeedback.averageScore >= 60 ? 'C' : 'D';
+  const overallGrade = companyFeedback.averageScore >= 90 ? 'A+' :
+                      companyFeedback.averageScore >= 80 ? 'A' :
+                      companyFeedback.averageScore >= 70 ? 'B' :
+                      companyFeedback.averageScore >= 60 ? 'C' : 'D';
 
-  const gradeColor = cumulativeFeedback.averageScore >= 80 ? 'text-green-600' :
-                     cumulativeFeedback.averageScore >= 70 ? 'text-yellow-600' : 'text-red-600';
+  const gradeColor = companyFeedback.averageScore >= 80 ? 'text-green-600' :
+                     companyFeedback.averageScore >= 70 ? 'text-yellow-600' : 'text-red-600';
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-5xl">
       {/* Header */}
       <div className="flex items-center gap-4 mb-8">
         <Button variant="ghost" size="icon" asChild>
@@ -84,73 +105,79 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
         </Button>
         
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
-            <Image
-              src={template.companyLogo}
-              alt={`${template.companyName} logo`}
-              width={40}
-              height={40}
-              className="rounded-full"
-            />
-          </div>
+          {template.companyLogo && (
+            <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center">
+              <Image
+                src={template.companyLogo}
+                alt={`${template.companyName} logo`}
+                width={40}
+                height={40}
+                className="rounded-full"
+              />
+            </div>
+          )}
           <div>
-            <h1 className="text-3xl font-bold">{template.companyName} - Overall Performance</h1>
+            <h1 className="text-3xl font-bold text-white">{template.companyName} - Overall Performance</h1>
             <p className="text-muted-foreground">Cumulative feedback across all completed rounds</p>
           </div>
         </div>
       </div>
 
       {/* Overall Score Card */}
-      <div className="card-border p-8 mb-8 text-center">
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
-            <Star className="w-10 h-10 text-primary" />
-          </div>
-          <div>
-            <div className="text-5xl font-bold text-primary mb-2">
-              {cumulativeFeedback.averageScore}/100
+      <Card className="mb-8 bg-card border-border w-full">
+        <CardContent className="p-8 text-center">
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center">
+              <Star className="w-10 h-10 text-primary" />
             </div>
-            <div className={`text-2xl font-bold ${gradeColor}`}>
-              Grade: {overallGrade}
+            <div>
+              <div className="text-5xl font-bold text-white mb-2">
+                {companyFeedback.averageScore}/100
+              </div>
+              <div className={`text-2xl font-bold ${gradeColor}`}>
+                Grade: {overallGrade}
+              </div>
             </div>
           </div>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">
-              {cumulativeFeedback.completedRounds}
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {companyFeedback.completedRounds}
+              </div>
+              <div className="text-sm text-muted-foreground">Rounds Completed</div>
             </div>
-            <div className="text-sm text-muted-foreground">Rounds Completed</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">
-              {template.rounds.length}
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {template.rounds.length}
+              </div>
+              <div className="text-sm text-muted-foreground">Total Rounds</div>
             </div>
-            <div className="text-sm text-muted-foreground">Total Rounds</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">
-              {Math.round((cumulativeFeedback.completedRounds / template.rounds.length) * 100)}%
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {Math.round((companyFeedback.completedRounds / template.rounds.length) * 100)}%
+              </div>
+              <div className="text-sm text-muted-foreground">Completion Rate</div>
             </div>
-            <div className="text-sm text-muted-foreground">Completion Rate</div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Round-by-Round Performance */}
-      <div className="card-border p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-6">Round-by-Round Performance</h2>
-        <div className="space-y-4">
-          {template.rounds.map((round) => {
-            const roundScore = cumulativeFeedback.roundScores.find(rs => rs.roundId === round.id);
+      <Card className="mb-8 bg-card border-border w-full">
+        <CardHeader>
+          <CardTitle className="text-white">Round-by-Round Performance</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {template.rounds.map((round: any) => {
+            const roundScore = companyFeedback.roundScores.find(rs => rs.roundId === round.id);
             const isCompleted = roundScore !== undefined;
             const scoreColor = roundScore ? 
               (roundScore.score >= 80 ? 'text-green-600' : 
                roundScore.score >= 60 ? 'text-yellow-600' : 'text-red-600') : 'text-gray-400';
 
             return (
-              <div key={round.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div key={round.id} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg">
                 <div className="flex items-center gap-4">
                   {isCompleted ? (
                     <CheckCircle className="w-6 h-6 text-green-500" />
@@ -158,7 +185,7 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
                     <Clock className="w-6 h-6 text-gray-400" />
                   )}
                   <div>
-                    <h3 className="font-medium">{round.name}</h3>
+                    <h3 className="font-medium text-white">{round.name}</h3>
                     <p className="text-sm text-muted-foreground">
                       {round.type === 'voice' ? 'Voice Interview' : 
                        round.type === 'code' ? 'Coding Challenge' : 'Text Interview'} • {round.duration} min
@@ -172,7 +199,7 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
                         {roundScore.score}/100
                       </div>
                       <div className="text-sm text-muted-foreground">
-                        Attempt #{roundScore.attempt}
+                        {roundScore.passed ? 'Passed' : 'Failed'}
                       </div>
                     </div>
                   ) : (
@@ -185,117 +212,132 @@ const CumulativeFeedbackPage = async ({ params }: CumulativeFeedbackProps) => {
               </div>
             );
           })}
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Strengths and Areas for Improvement */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <div className="card-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="w-5 h-5 text-green-500" />
-            <h2 className="text-xl font-semibold">Key Strengths</h2>
-          </div>
-          {cumulativeFeedback.overallStrengths.length > 0 ? (
-            <div className="space-y-2">
-              {cumulativeFeedback.overallStrengths.map((strength, index) => (
-                <div key={index} className="flex items-start gap-2 p-3 bg-green-50 rounded-lg">
-                  <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-green-800">{strength}</span>
-                </div>
-              ))}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-green-500" />
+              <CardTitle className="text-white">Key Strengths</CardTitle>
             </div>
-          ) : (
-            <p className="text-muted-foreground">No specific strengths identified yet.</p>
-          )}
-        </div>
+          </CardHeader>
+          <CardContent>
+            {companyFeedback.strengths.length > 0 ? (
+              <div className="space-y-2">
+                {companyFeedback.strengths.map((strength, index) => (
+                  <div key={index} className="flex items-start gap-2 p-3 bg-green-900/20 rounded-lg">
+                    <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-green-400">{strength}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No specific strengths identified yet.</p>
+            )}
+          </CardContent>
+        </Card>
 
-        <div className="card-border p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingDown className="w-5 h-5 text-orange-500" />
-            <h2 className="text-xl font-semibold">Areas for Improvement</h2>
-          </div>
-          {cumulativeFeedback.overallAreasForImprovement.length > 0 ? (
-            <div className="space-y-2">
-              {cumulativeFeedback.overallAreasForImprovement.map((area, index) => (
-                <div key={index} className="flex items-start gap-2 p-3 bg-orange-50 rounded-lg">
-                  <Target className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                  <span className="text-orange-800">{area}</span>
-                </div>
-              ))}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <div className="flex items-center gap-2">
+              <TrendingDown className="w-5 h-5 text-orange-500" />
+              <CardTitle className="text-white">Areas for Improvement</CardTitle>
             </div>
-          ) : (
-            <p className="text-muted-foreground">No specific areas for improvement identified.</p>
-          )}
-        </div>
+          </CardHeader>
+          <CardContent>
+            {companyFeedback.areasForImprovement.length > 0 ? (
+              <div className="space-y-2">
+                {companyFeedback.areasForImprovement.map((area, index) => (
+                  <div key={index} className="flex items-start gap-2 p-3 bg-orange-900/20 rounded-lg">
+                    <Target className="w-4 h-4 text-orange-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-orange-400">{area}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">No specific areas for improvement identified.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Detailed Assessment */}
-      <div className="card-border p-6 mb-8">
-        <h2 className="text-xl font-semibold mb-4">Overall Assessment</h2>
-        <div className="prose max-w-none">
-          <p className="text-muted-foreground leading-relaxed">
-            {cumulativeFeedback.finalAssessment}
-          </p>
-        </div>
-      </div>
+      <Card className="mb-8 bg-card border-border w-full">
+        <CardHeader>
+          <CardTitle className="text-white">Overall Assessment</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="prose max-w-none">
+            <p className="text-muted-foreground leading-relaxed">
+              {companyFeedback.finalAssessment}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Hiring Recommendation */}
-      <div className="card-border p-6 mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <Award className="w-6 h-6 text-primary" />
-          <h2 className="text-xl font-semibold">Hiring Recommendation</h2>
-        </div>
-        
-        <div className="text-center">
-          <div className={`text-3xl font-bold mb-2 ${
-            cumulativeFeedback.averageScore >= 80 ? 'text-green-600' :
-            cumulativeFeedback.averageScore >= 70 ? 'text-yellow-600' : 'text-red-600'
-          }`}>
-            {cumulativeFeedback.averageScore >= 80 ? 'STRONG HIRE' :
-             cumulativeFeedback.averageScore >= 70 ? 'HIRE' : 'NO HIRE'}
+      <Card className="mb-8 bg-card border-border w-full">
+        <CardHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <Award className="w-6 h-6 text-primary" />
+            <CardTitle className="text-white">Hiring Recommendation</CardTitle>
           </div>
-          <p className="text-muted-foreground mb-4">
-            {cumulativeFeedback.averageScore >= 80 ? 
-              'Excellent performance across all rounds. Strong candidate for the role.' :
-              cumulativeFeedback.averageScore >= 70 ?
-              'Good performance with room for improvement. Consider for the role.' :
-              'Performance below expectations. Consider additional preparation or different role.'
-            }
-          </p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                {cumulativeFeedback.averageScore >= 80 ? '90%' : 
-                 cumulativeFeedback.averageScore >= 70 ? '70%' : '30%'}
-              </div>
-              <div className="text-sm text-muted-foreground">Hire Probability</div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center">
+            <div className={`text-3xl font-bold mb-2 ${
+              companyFeedback.averageScore >= 80 ? 'text-green-600' :
+              companyFeedback.averageScore >= 70 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {companyFeedback.averageScore >= 80 ? 'STRONG HIRE' :
+               companyFeedback.averageScore >= 70 ? 'HIRE' : 'NO HIRE'}
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                {cumulativeFeedback.completedRounds >= template.rounds.length ? 'Complete' : 'In Progress'}
+            <p className="text-muted-foreground mb-4">
+              {companyFeedback.averageScore >= 80 ? 
+                'Excellent performance across all rounds. Strong candidate for the role.' :
+                companyFeedback.averageScore >= 70 ?
+                'Good performance with room for improvement. Consider for the role.' :
+                'Performance below expectations. Consider additional preparation or different role.'
+              }
+            </p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <div className="text-2xl font-bold text-primary">
+                  {companyFeedback.averageScore >= 80 ? '90%' : 
+                   companyFeedback.averageScore >= 70 ? '70%' : '30%'}
+                </div>
+                <div className="text-sm text-muted-foreground">Hire Probability</div>
               </div>
-              <div className="text-sm text-muted-foreground">Interview Status</div>
-            </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-2xl font-bold text-primary">
-                {overallGrade}
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <div className="text-2xl font-bold text-primary">
+                  {companyFeedback.completedRounds >= template.rounds.length ? 'Complete' : 'In Progress'}
+                </div>
+                <div className="text-sm text-muted-foreground">Interview Status</div>
               </div>
-              <div className="text-sm text-muted-foreground">Overall Grade</div>
+              <div className="text-center p-4 bg-gray-800/50 rounded-lg">
+                <div className="text-2xl font-bold text-primary">
+                  {overallGrade}
+                </div>
+                <div className="text-sm text-muted-foreground">Overall Grade</div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Action Buttons */}
-      <div className="flex gap-4 justify-center">
-        <Button asChild variant="outline">
+      <div className="flex flex-wrap gap-4 justify-center mt-8">
+        <Button asChild variant="outline" className="border-border text-white hover:bg-muted">
           <Link href={`/companies/${templateId}`}>
             Back to Interview
           </Link>
         </Button>
-        {cumulativeFeedback.completedRounds < template.rounds.length && (
-          <Button asChild className="btn-primary">
+        {companyFeedback.completedRounds < template.rounds.length && (
+          <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
             <Link href={`/companies/${templateId}`}>
               Continue Interview
             </Link>

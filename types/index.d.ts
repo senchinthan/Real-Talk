@@ -1,6 +1,7 @@
-interface Feedback {
+export interface Feedback {
   id: string;
   interviewId: string;
+  userId: string;
   attempt?: number;
   totalScore: number;
   categoryScores: Array<{
@@ -14,7 +15,7 @@ interface Feedback {
   createdAt: string;
 }
 
-interface CompanyTemplate {
+export interface CompanyTemplate {
   id: string;
   companyName: string;
   companyLogo: string;
@@ -24,7 +25,7 @@ interface CompanyTemplate {
   createdAt: string;
 }
 
-interface Question {
+export interface Question {
   id: string;
   text: string;
   type: 'mcq' | 'text' | 'code';
@@ -35,22 +36,27 @@ interface Question {
   points?: number;
 }
 
-interface TestCase {
+export interface TestCase {
   input: string;
   expectedOutput: string;
   isHidden?: boolean;
 }
 
-interface Round {
+export interface Round {
   id: string;
   name: string; // "Aptitude", "Coding", "System Design", "Behavioral"
   type: "voice" | "text" | "code" | "aptitude";
   duration: number; // in minutes
-  questions: Question[] | string[]; // Support both old and new format
+  // New fields for question bank references
+  questionBankId?: string; // ID of the question bank to use
+  questionCount?: number; // Number of questions to use from the bank
+  promptTemplateId?: string; // ID of the prompt template for voice/text interviews
+  difficulty?: 'easy' | 'medium' | 'hard' | 'mixed'; // Difficulty level
+  questions?: Question[] | string[]; // For backward compatibility
   passingScore?: number;
 }
 
-interface UserAnswer {
+export interface UserAnswer {
   questionId: string;
   answer: string | number;
   code?: string;
@@ -59,7 +65,7 @@ interface UserAnswer {
   score?: number;
 }
 
-interface CompanyInterview {
+export interface CompanyInterview {
   id: string;
   templateId: string;
   companyName: string;
@@ -68,12 +74,45 @@ interface CompanyInterview {
   completedRounds: string[]; // array of round IDs
 }
 
-interface RoundFeedback extends Feedback {
+export interface RoundFeedback {
+  id: string;
+  interviewId: string;
+  userId: string;
+  templateId: string;
   roundId: string;
   roundName: string;
+  roundType: string;
+  attempt?: number;
+  score: number;
+  passingScore: number;
+  passed: boolean;
+  answers?: UserAnswer[];
+  createdAt: string;
 }
 
-interface Interview {
+export interface CompanyFeedback {
+  id: string;
+  interviewId: string;
+  userId: string;
+  templateId: string;
+  companyName: string;
+  totalRounds: number;
+  completedRounds: number;
+  averageScore: number;
+  roundScores: Array<{
+    roundId: string;
+    roundName: string;
+    roundType: string;
+    score: number;
+    passed: boolean;
+  }>;
+  strengths: string[];
+  areasForImprovement: string[];
+  finalAssessment: string;
+  createdAt: string;
+}
+
+export interface Interview {
   id: string;
   role: string;
   level: string;
@@ -87,7 +126,7 @@ interface Interview {
   roundId?: string;
 }
 
-interface CreateFeedbackParams {
+export interface CreateFeedbackParams {
   interviewId: string;
   userId: string;
   transcript: { role: string; content: string }[];
@@ -96,13 +135,16 @@ interface CreateFeedbackParams {
   roundName?: string;
 }
 
-interface User {
+export interface User {
   name: string;
   email: string;
+  image: string;
   id: string;
+  role?: string;
+  isAdmin?: boolean;
 }
 
-interface InterviewCardProps {
+export interface InterviewCardProps {
   id?: string;
   userId?: string;
   role: string;
@@ -111,9 +153,10 @@ interface InterviewCardProps {
   createdAt?: string;
 }
 
-interface AgentProps {
+export interface AgentProps {
   userName: string;
   userId?: string;
+  userRole: string;
   interviewId?: string;
   feedbackId?: string;
   type: "generate" | "interview";
@@ -122,7 +165,7 @@ interface AgentProps {
   roundName?: string;
 }
 
-interface RouteParams {
+export interface RouteParams {
   params: Promise<Record<string, string>>;
   searchParams: Promise<Record<string, string>>;
 }
@@ -162,4 +205,26 @@ interface InterviewFormProps {
 
 interface TechIconProps {
   techStack: string[];
+}
+
+interface QuestionBank {
+  id: string;
+  name: string;
+  description: string;
+  type: 'aptitude' | 'coding';
+  difficulty: 'easy' | 'medium' | 'hard' | 'mixed';
+  createdAt: string;
+  updatedAt?: string;
+  questionIds: string[];
+  isActive: boolean;
+}
+
+interface AptitudeQuestionBank extends QuestionBank {
+  type: 'aptitude';
+  questions?: Question[];
+}
+
+interface CodingQuestionBank extends QuestionBank {
+  type: 'coding';
+  questions?: Question[];
 }

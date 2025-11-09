@@ -6,10 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { getCompanyTemplates } from '@/lib/actions/company.action';
+import { getCurrentUser } from '@/lib/actions/auth.action';
 import { Building2, Clock, Users, Star } from 'lucide-react';
 
 const CompaniesPage = async () => {
-  const templates = await getCompanyTemplates();
+  const user = await getCurrentUser();
+  const isAdmin = user?.isAdmin || user?.role === 'admin' || false;
+  const templates = await getCompanyTemplates(isAdmin);
 
   return (
     <div className="container mx-auto px-4 py-8">
