@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // Using Webpack configuration (default)
+    // No Turbopack configuration needed
     eslint: {
         ignoreDuringBuilds: true,
     },
