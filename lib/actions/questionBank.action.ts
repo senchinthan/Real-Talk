@@ -437,6 +437,38 @@ export async function updateAptitudeQuestionBank(bankId: string, bankData: Parti
   }
 }
 
+// Update a text question bank
+export async function updateTextQuestionBank(bankId: string, bankData: Partial<TextQuestionBank>): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if the bank exists
+    const bankDoc = await db.collection('textQuestionBanks').doc(bankId).get();
+    
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Text question bank not found' };
+    }
+    
+    // Remove id and type from the data to be updated (if present)
+    const { id, type, questions, ...dataToUpdate } = bankData;
+    
+    // Add updatedAt timestamp
+    const updateData = {
+      ...dataToUpdate,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Update the bank document
+    await db.collection('textQuestionBanks').doc(bankId).update(updateData);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating text question bank:', error);
+    return {
+      success: false,
+      error: 'Failed to update text question bank'
+    };
+  }
+}
+
 // Delete an aptitude question bank
 export async function deleteAptitudeQuestionBank(bankId: string): Promise<{ success: boolean; error?: string }> {
   try {
