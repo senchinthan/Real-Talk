@@ -660,6 +660,170 @@ export async function removeQuestionFromAptitudeBank(
   }
 }
 
+// Add a question to a coding question bank
+export async function addQuestionToCodingBank(
+  bankId: string, 
+  questionData: string | Question
+): Promise<{ success: boolean; questionId?: string; error?: string }> {
+  try {
+    // Check if the bank exists
+    const bankRef = db.collection('codingQuestionBanks').doc(bankId);
+    const bankDoc = await bankRef.get();
+    
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Question bank not found' };
+    }
+    
+    let questionId: string;
+    
+    // If questionData is a string, it's an existing question ID
+    if (typeof questionData === 'string') {
+      questionId = questionData;
+      const questionDoc = await db.collection('codingQuestions').doc(questionId).get();
+      if (!questionDoc.exists) {
+        return { success: false, error: 'Question not found' };
+      }
+    } else {
+      // It's a new question object
+      const questionRef = await db.collection('codingQuestions').add({
+        ...questionData,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+      questionId = questionRef.id;
+    }
+    
+    // Add the question ID to the bank's questionIds array if not already present
+    const bankData = bankDoc.data() as CodingQuestionBank;
+    const questionIds = bankData.questionIds || [];
+    
+    if (!questionIds.includes(questionId)) {
+      await bankRef.update({
+        questionIds: firestore.FieldValue.arrayUnion(questionId),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    return { success: true, questionId };
+  } catch (error) {
+    console.error('Error adding question to coding bank:', error);
+    return { success: false, error: 'Failed to add question to bank' };
+  }
+}
+
+// Add a question to a text question bank
+export async function addQuestionToTextBank(
+  bankId: string, 
+  questionData: string | Question
+): Promise<{ success: boolean; questionId?: string; error?: string }> {
+  try {
+    // Check if the bank exists
+    const bankRef = db.collection('textQuestionBanks').doc(bankId);
+    const bankDoc = await bankRef.get();
+    
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Question bank not found' };
+    }
+    
+    let questionId: string;
+    
+    // If questionData is a string, it's an existing question ID
+    if (typeof questionData === 'string') {
+      questionId = questionData;
+      const questionDoc = await db.collection('textQuestions').doc(questionId).get();
+      if (!questionDoc.exists) {
+        return { success: false, error: 'Question not found' };
+      }
+    } else {
+      // It's a new question object
+      const questionRef = await db.collection('textQuestions').add({
+        ...questionData,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+      questionId = questionRef.id;
+    }
+    
+    // Add the question ID to the bank's questionIds array if not already present
+    const bankData = bankDoc.data() as TextQuestionBank;
+    const questionIds = bankData.questionIds || [];
+    
+    if (!questionIds.includes(questionId)) {
+      await bankRef.update({
+        questionIds: firestore.FieldValue.arrayUnion(questionId),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+    }
+    
+    return { success: true, questionId };
+  } catch (error) {
+    console.error('Error adding question to text bank:', error);
+    return { success: false, error: 'Failed to add question to bank' };
+  }
+}
+
+// Remove a question from a coding question bank
+export async function removeQuestionFromCodingBank(
+  bankId: string, 
+  questionId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const bankRef = db.collection('codingQuestionBanks').doc(bankId);
+    
+    // Remove the question ID from the bank's questionIds array
+    await bankRef.update({
+      questionIds: firestore.FieldValue.arrayRemove(questionId),
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error removing question from coding bank:', error);
+    return { success: false, error: 'Failed to remove question from bank' };
+  }
+}
+
+// Remove a question from a text question bank
+export async function removeQuestionFromTextBank(
+  bankId: string, 
+  questionId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const bankRef = db.collection('textQuestionBanks').doc(bankId);
+    
+    // Remove the question ID from the bank's questionIds array
+    await bankRef.update({
+      questionIds: firestore.FieldValue.arrayRemove(questionId),
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error removing question from text bank:', error);
+    return { success: false, error: 'Failed to remove question from bank' };
+  }
+}
+
+// Update a coding question bank
+export async function updateCodingQuestionBank(
+  bankId: string, 
+  bankData: Partial<CodingQuestionBank>
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const bankRef = db.collection('codingQuestionBanks').doc(bankId);
+    
+    await bankRef.update({
+      ...bankData,
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating coding question bank:', error);
+    return { success: false, error: 'Failed to update question bank' };
+  }
+}
+
 // Update a question in any question collection
 export async function updateQuestion(questionId: string, questionData: Partial<Question>): Promise<{ success: boolean; error?: string }> {
   try {
