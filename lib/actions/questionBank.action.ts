@@ -405,6 +405,38 @@ export async function createCodingQuestionBank(bankData: {
   }
 }
 
+// Update an aptitude question bank
+export async function updateAptitudeQuestionBank(bankId: string, bankData: Partial<AptitudeQuestionBank>): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if the bank exists
+    const bankDoc = await db.collection('aptitudeQuestionBanks').doc(bankId).get();
+    
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Question bank not found' };
+    }
+    
+    // Remove id and type from the data to be updated (if present)
+    const { id, type, questions, ...dataToUpdate } = bankData;
+    
+    // Add updatedAt timestamp
+    const updateData = {
+      ...dataToUpdate,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Update the bank document
+    await db.collection('aptitudeQuestionBanks').doc(bankId).update(updateData);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating aptitude question bank:', error);
+    return {
+      success: false,
+      error: 'Failed to update aptitude question bank'
+    };
+  }
+}
+
 // Delete an aptitude question bank
 export async function deleteAptitudeQuestionBank(bankId: string): Promise<{ success: boolean; error?: string }> {
   try {
@@ -497,6 +529,102 @@ export async function getQuestionById(questionId: string): Promise<Question | nu
   } catch (error) {
     console.error('Error getting question by ID:', error);
     return null;
+  }
+}
+
+// Add a question to an aptitude question bank
+export async function addQuestionToAptitudeBank(
+  bankId: string, 
+  questionData: string | Question
+): Promise<{ success: boolean; questionId?: string; error?: string }> {
+  try {
+    const bankRef = db.collection('aptitudeQuestionBanks').doc(bankId);
+    
+    // Get the current bank data
+    const bankDoc = await bankRef.get();
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Question bank not found' };
+    }
+    
+    const bankData = bankDoc.data() as AptitudeQuestionBank;
+    const questionIds = bankData.questionIds || [];
+    
+    let questionIdToAdd: string;
+    
+    // If questionData is a string, it's an existing question ID
+    if (typeof questionData === 'string') {
+      // Check if question already exists in the bank
+      if (questionIds.includes(questionData)) {
+        return { success: false, error: 'Question already exists in this bank' };
+      }
+      
+      // Verify the question exists
+      const questionDoc = await db.collection('aptitudeQuestions').doc(questionData).get();
+      if (!questionDoc.exists) {
+        return { success: false, error: 'Question not found' };
+      }
+      questionIdToAdd = questionData;
+    } else {
+      // It's a new question object, create it first
+      const questionRef = await db.collection('aptitudeQuestions').add({
+        ...questionData,
+        createdAt: firestore.FieldValue.serverTimestamp(),
+        updatedAt: firestore.FieldValue.serverTimestamp()
+      });
+      questionIdToAdd = questionRef.id;
+    }
+    
+    
+    // Update the bank with the new question ID
+    await bankRef.update({
+      questionIds: [...questionIds, questionIdToAdd],
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true, questionId: questionIdToAdd };
+  } catch (error) {
+    console.error('Error adding question to aptitude bank:', error);
+    return { success: false, error: 'Failed to add question to bank' };
+  }
+}
+
+// Remove a question from an aptitude question bank
+export async function removeQuestionFromAptitudeBank(
+  bankId: string, 
+  questionId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const bankRef = db.collection('aptitudeQuestionBanks').doc(bankId);
+    
+    // Get the current bank data
+    const bankDoc = await bankRef.get();
+    if (!bankDoc.exists) {
+      return { success: false, error: 'Question bank not found' };
+    }
+    
+    const bankData = bankDoc.data() as AptitudeQuestionBank;
+    const questionIds = bankData.questionIds || [];
+    
+    // Check if question exists in the bank
+    const questionIndex = questionIds.indexOf(questionId);
+    if (questionIndex === -1) {
+      return { success: false, error: 'Question not found in this bank' };
+    }
+    
+    // Remove the question ID from the array
+    const updatedQuestionIds = [...questionIds];
+    updatedQuestionIds.splice(questionIndex, 1);
+    
+    // Update the bank with the modified question IDs
+    await bankRef.update({
+      questionIds: updatedQuestionIds,
+      updatedAt: firestore.FieldValue.serverTimestamp()
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error removing question from aptitude bank:', error);
+    return { success: false, error: 'Failed to remove question from bank' };
   }
 }
 

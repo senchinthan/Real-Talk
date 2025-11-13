@@ -262,8 +262,9 @@ const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundN
                 </div>
             </div>
 
+            {/* Added margin-top for gap between cards and transcript */}
             {messages.length > 0 && (
-                <div className="transcript-border">
+                <div className="transcript-border mt-6">
                     <div className="transcript">
                         <p
                             key={latestmessage}
@@ -278,7 +279,8 @@ const Agent = ({ userName, userId, type, interviewId, questions, roundId, roundN
                 </div>
             )}
 
-            <div className="w-full flex justify-center">
+            {/* Added margin-top to create gap between cards and button */}
+            <div className="w-full flex justify-center mt-8">
                 {callStatus !== "ACTIVE" ? (
                     <button className="relative btn-call" onClick={handleCall}>
                         <span className={cn("absolute animate-ping rounded-full opacity-75", callStatus !== "CONNECTING" && "hidden")}

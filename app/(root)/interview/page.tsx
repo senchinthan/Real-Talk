@@ -5,15 +5,16 @@ const Page = async () => {
     const user = await getCurrentUser();
 
     return (
-        <>
-            <h3>Interview generation</h3>
+        <div className="pt-16"> {/* Added padding-top to ensure content is below the floating menu */}
+            <h3 className="text-xl font-semibold">Interview generation</h3>
 
             <Agent
                 userName={user?.name!}
                 userId={user?.id}
                 type="generate"
+                interviewId="generate" // Adding required interviewId prop
             />
-        </>
+        </div>
     );
 };
 

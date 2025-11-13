@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/actions/auth.action';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { templateId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     // Check if user is authenticated and is an admin
@@ -16,7 +16,7 @@ export async function POST(
       );
     }
 
-    const templateId = params.templateId;
+    const templateId = params.id;
     
     if (!templateId) {
       return NextResponse.json(
